@@ -26,6 +26,17 @@ Paste your hosted client URL here:
 - Category toggles in YAML so players can tailor article pool
 - Reconnect note: progress resume is not fully reliable yet. If you disconnect, use search to jump back to your last article and continue.
 
+##  How Wikipelago Works:
+Wikipelago is an Archipelago custom world based on Wikipedia racing.
+
+Each round gives you a Start article and a Target article.
+You navigate by clicking Wikipedia links to reach the Target.
+When you reach the Target, that check is sent to Archipelago.
+
+As you progress, you collect Knowledge Fragments and other progression items.
+Those unlock more rounds and eventually let you clear the Grand Goal.
+
+
 ## Category Toggles (YAML)
 
 Players can enable/disable article groups in their YAML:
