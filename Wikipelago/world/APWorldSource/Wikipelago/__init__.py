@@ -1,23 +1,17 @@
 from __future__ import annotations
 
-import json
 import re
-import urllib.parse
-import urllib.request
 from typing import Any
 
 from BaseClasses import Item, Location
 from worlds.AutoWorld import WebWorld, World
 from worlds.generic.Rules import set_rule
 
-from .entertainment_articles import ENTERTAINMENT_ARTICLE_POOL
 from .Items import item_table
 from .Locations import location_table
 from .Options import WikipelagoOptions
 from .Regions import create_regions
-
-
-WIKI_API = "https://en.wikipedia.org/w/api.php"
+from .entertainment_articles import ENTERTAINMENT_ARTICLE_POOL
 
 STOPWORDS: set[str] = {
     "the", "a", "an", "and", "or", "of", "in", "on", "to", "for", "by", "with",
@@ -79,46 +73,61 @@ BANNED_EXACT_TITLES: set[str] = {
 }
 
 TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "video_games": ("game", "mario", "zelda", "pokemon", "halo", "souls", "ring", "minecraft"),
-    "board_games": ("board game", "card game", "chess", "catan", "mahjong", "poker", "dungeons"),
-    "movies": ("film", "movie", "avengers", "star wars", "godfather", "matrix", "dark knight"),
-    "tv_shows": ("tv", "series", "show", "breaking bad", "simpsons", "spongebob", "stranger things"),
+    "video_games": (
+        "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "pokemon", "dark souls",
+        "elden ring", "halo", "mario", "baldur's gate", "stardew valley", "hollow knight", "celeste",
+        "among us", "tetris", "call of duty", "resident evil", "final fantasy", "metroid", "portal",
+    ),
+    "board_games": (
+        "board game", "card game", "chess", "checkers", "catan", "monopoly", "mahjong", "scrabble",
+        "go (game)", "dungeons & dragons", "risk (game)", "ticket to ride (board game)", "carcassonne (board game)",
+    ),
+    "movies": (
+        "(film)", "film", "movie", "star wars", "the dark knight", "the matrix", "lord of the rings",
+        "avengers", "jurassic park", "toy story", "inception", "interstellar", "dune", "oppenheimer",
+    ),
+    "tv_shows": (
+        "(tv series)", "television series", "tv series", "television show", "breaking bad", "stranger things",
+        "game of thrones", "the simpsons", "spongebob", "avatar: the last airbender", "friends", "the office",
+        "the last of us (tv series)",
+    ),
+    "anime_manga": (
+        "anime", "manga", "naruto", "one piece", "dragon ball", "attack on titan", "death note",
+        "demon slayer", "jujutsu kaisen", "my hero academia", "fullmetal alchemist", "bleach",
+    ),
+    "sports": (
+        "football", "basketball", "baseball", "soccer", "tennis", "olympic", "fifa", "nba", "nfl",
+        "champions league", "world cup", "formula one", "golf", "cricket", "wwe",
+    ),
+    "science_space": (
+        "astronomy", "planet", "galaxy", "black hole", "physics", "biology", "mathematics", "space telescope",
+        "apollo", "mars", "milky way", "quantum", "relativity", "dna", "fossil",
+    ),
+    "technology": (
+        "internet", "computer", "software", "website", "youtube", "google", "wikipedia", "smartphone",
+        "artificial intelligence", "virtual reality", "social media", "web browser", "operating system",
+    ),
+    "history": (
+        "ancient", "history of", "war", "renaissance", "industrial revolution", "middle ages", "roman empire",
+        "world war", "cold war", "silk road", "black death", "moon landing",
+    ),
+    "geography": (
+        "mountain", "river", "desert", "ocean", "national park", "city", "country", "continent",
+        "waterfall", "island", "volcano", "forest", "landmark",
+    ),
+    "food_cuisine": (
+        "cuisine", "dish", "food", "pizza", "sushi", "pasta", "burger", "taco", "ramen", "chocolate",
+        "coffee", "tea", "ice cream", "sandwich",
+    ),
+    "art_literature": (
+        "novel", "book", "author", "poetry", "painting", "sculpture", "museum", "theater", "literature",
+        "shakespeare", "mona lisa", "van gogh", "picasso", "harry potter",
+    ),
+    "mythology_folklore": (
+        "mythology", "folklore", "greek god", "norse", "myth", "legend", "dragon", "vampire",
+        "werewolf", "mermaid", "odin", "zeus", "athena",
+    ),
 }
-
-TOPIC_NEIGHBORS: dict[str, set[str]] = {
-    "video_games": {"board_games", "movies", "tv_shows"},
-    "board_games": {"video_games", "movies"},
-    "movies": {"tv_shows", "video_games", "board_games"},
-    "tv_shows": {"movies", "video_games"},
-}
-
-GAMING_BOOST: list[str] = [
-    "Video game",
-    "Game design",
-    "First-person shooter",
-    "Open world",
-    "Esports",
-    "Nintendo",
-    "PlayStation",
-    "Xbox",
-    "Steam (service)",
-    "Unreal Engine",
-    "Unity (game engine)",
-    "Minecraft",
-    "Fortnite",
-    "League of Legends",
-    "Dota 2",
-    "Valorant",
-    "Overwatch",
-    "Rocket League",
-    "The Legend of Zelda",
-    "Super Mario",
-    "Pokemon",
-    "Sonic the Hedgehog",
-    "Final Fantasy",
-    "Tetris",
-    "Pac-Man",
-]
 
 
 def _preset_goal_name(option_value: int) -> str:
@@ -145,6 +154,32 @@ def _preset_goal_name(option_value: int) -> str:
         19: "Halo: Combat Evolved",
     }
     return mapping.get(option_value, "Minecraft")
+
+
+def _preset_goal_topic(option_value: int) -> str:
+    mapping = {
+        0: "video_games",
+        1: "video_games",
+        2: "video_games",
+        3: "video_games",
+        4: "video_games",
+        5: "video_games",
+        6: "board_games",
+        7: "board_games",
+        8: "movies",
+        9: "movies",
+        10: "movies",
+        11: "movies",
+        12: "tv_shows",
+        13: "tv_shows",
+        14: "tv_shows",
+        15: "tv_shows",
+        16: "tv_shows",
+        17: "tv_shows",
+        18: "video_games",
+        19: "video_games",
+    }
+    return mapping.get(option_value, "video_games")
 
 
 class WikipelagoWeb(WebWorld):
@@ -175,53 +210,6 @@ class WikipelagoWorld(World):
     round_pairs: list[dict[str, str]]
     goal_article: str
 
-    def _try_expand_pool(self, pool: list[str], required_size: int) -> list[str]:
-        if len(pool) >= required_size:
-            return pool
-
-        seen = set(pool)
-        token: str | None = None
-
-        while len(pool) < required_size:
-            params = {
-                "action": "query",
-                "list": "allpages",
-                "apnamespace": "0",
-                "apfilterredir": "nonredirects",
-                "aplimit": "500",
-                "format": "json",
-            }
-            if token:
-                params["apcontinue"] = token
-
-            url = f"{WIKI_API}?{urllib.parse.urlencode(params)}"
-            try:
-                with urllib.request.urlopen(url, timeout=10) as response:
-                    payload = json.loads(response.read().decode("utf-8"))
-            except Exception:
-                break
-
-            pages = payload.get("query", {}).get("allpages", [])
-            for page in pages:
-                title = str(page.get("title", "")).strip()
-                if (
-                    not title
-                    or title in seen
-                    or not self._is_reasonable_title(title)
-                    or not self._looks_common_knowledge(title)
-                ):
-                    continue
-                seen.add(title)
-                pool.append(title)
-                if len(pool) >= required_size:
-                    break
-
-            token = payload.get("continue", {}).get("apcontinue")
-            if not token:
-                break
-
-        return pool
-
     @staticmethod
     def _is_reasonable_title(title: str) -> bool:
         if len(title) < 3 or len(title) > 120:
@@ -234,24 +222,12 @@ class WikipelagoWorld(World):
             return False
         return True
 
-
     @staticmethod
     def _looks_common_knowledge(title: str) -> bool:
         lowered = title.lower().strip()
         if title in BANNED_EXACT_TITLES:
             return False
-        if lowered.startswith(
-            (
-                "list of ",
-                "outline of ",
-                "timeline of ",
-                "index of ",
-                "category:",
-                "template:",
-                "help:",
-                "portal:",
-            )
-        ):
+        if lowered.startswith(("list of ", "outline of ", "timeline of ", "index of ", "category:", "template:", "help:", "portal:")):
             return False
         if any(keyword in lowered for keyword in BANNED_TITLE_KEYWORDS):
             return False
@@ -263,33 +239,63 @@ class WikipelagoWorld(World):
             return False
         if re.search(r"^\d", title):
             return False
-        if re.search(
-            r"\((disambiguation|album|song|single|magazine|journal)\)$",
-            lowered,
-        ):
+        if re.search(r"\((disambiguation|album|song|single|magazine|journal)\)$", lowered):
             return False
         if len(title.split()) > 6:
             return False
         if re.search(r"[A-Za-z].*\d.*\d.*\d", title):
             return False
         return True
+
     @staticmethod
     def _title_tokens(title: str) -> set[str]:
         tokens = {tok for tok in re.findall(r"[A-Za-z]+", title.lower()) if len(tok) > 2}
         return {tok for tok in tokens if tok not in STOPWORDS}
+
     def _infer_topic(self, title: str) -> str:
         lowered = title.lower()
         for topic, keywords in TOPIC_KEYWORDS.items():
             if any(keyword in lowered for keyword in keywords):
                 return topic
-        return "society"
+        return "video_games"
+
+    def _selected_topics(self) -> set[str]:
+        selected: set[str] = set()
+        if self.options.include_video_games.value:
+            selected.add("video_games")
+        if self.options.include_board_games.value:
+            selected.add("board_games")
+        if self.options.include_movies.value:
+            selected.add("movies")
+        if self.options.include_tv_shows.value:
+            selected.add("tv_shows")
+        if self.options.include_anime_manga.value:
+            selected.add("anime_manga")
+        if self.options.include_sports.value:
+            selected.add("sports")
+        if self.options.include_science_space.value:
+            selected.add("science_space")
+        if self.options.include_technology.value:
+            selected.add("technology")
+        if self.options.include_history.value:
+            selected.add("history")
+        if self.options.include_geography.value:
+            selected.add("geography")
+        if self.options.include_food_cuisine.value:
+            selected.add("food_cuisine")
+        if self.options.include_art_literature.value:
+            selected.add("art_literature")
+        if self.options.include_mythology_folklore.value:
+            selected.add("mythology_folklore")
+        return selected
+
+    def _filter_pool_by_topics(self, pool: list[str], selected_topics: set[str]) -> list[str]:
+        return [title for title in pool if self._infer_topic(title) in selected_topics]
 
     def _is_doable_pair(self, start: str, target: str) -> bool:
-        s_topic = self._infer_topic(start)
-        t_topic = self._infer_topic(target)
-        if s_topic == t_topic:
-            return True
-        return t_topic in TOPIC_NEIGHBORS.get(s_topic, set())
+        # Keep pairing permissive with broad category mixes.
+        return True
+
     def _is_challenging_pair(self, start: str, target: str) -> bool:
         if start == target:
             return False
@@ -302,29 +308,40 @@ class WikipelagoWorld(World):
         if s_tokens and t_tokens and s_tokens.intersection(t_tokens):
             return False
         return True
+
     def generate_early(self) -> None:
         round_count = self.options.check_count.value
+        selected_topics = self._selected_topics()
+        if not selected_topics:
+            raise Exception(
+                "Wikipelago requires at least one enabled category. "
+                "Enable one or more category toggles in your YAML (games/movies/shows/anime/sports/science/tech/history/geography/food/art/mythology)."
+            )
 
         pool = list(dict.fromkeys(ENTERTAINMENT_ARTICLE_POOL))
-
-        filtered_pool = [
-            title
-            for title in pool
-            if self._is_reasonable_title(title) and self._looks_common_knowledge(title)
-        ]
+        filtered_pool = [title for title in pool if self._is_reasonable_title(title) and self._looks_common_knowledge(title)]
+        filtered_pool = self._filter_pool_by_topics(filtered_pool, selected_topics)
 
         needed_total = max(2, round_count * 2)
         if len(filtered_pool) < needed_total:
             raise Exception(
                 "Wikipelago entertainment-only mode failed: "
                 f"need at least {needed_total} unique titles for {round_count} rounds, "
-                f"but only have {len(filtered_pool)} after filters."
+                f"but only have {len(filtered_pool)} after filters and category toggles."
             )
 
         if self.options.random_goal_article.value:
             self.goal_article = self.random.choice(filtered_pool)
         else:
-            self.goal_article = _preset_goal_name(self.options.goal_article_preset.value)
+            goal_preset_value = self.options.goal_article_preset.value
+            self.goal_article = _preset_goal_name(goal_preset_value)
+            goal_topic = _preset_goal_topic(goal_preset_value)
+            if goal_topic not in selected_topics:
+                raise Exception(
+                    "Wikipelago goal article preset category is disabled. "
+                    f"Goal '{self.goal_article}' is in category '{goal_topic}'. "
+                    "Enable that category or set random_goal_article: true."
+                )
             if self.goal_article not in filtered_pool:
                 filtered_pool.append(self.goal_article)
 
@@ -341,26 +358,16 @@ class WikipelagoWorld(World):
 
         picks = self.random.sample(remaining, needed_non_goal)
         non_final_targets = picks[: round_count - 1]
-        base_starts = picks[round_count - 1 :]
+        base_starts = picks[round_count - 1:]
 
         targets = non_final_targets + [self.goal_article]
         unused_starts = list(base_starts)
         pairs: list[dict[str, str]] = []
 
         for target in targets:
-            challenging_and_doable = [
-                start for start in unused_starts
-                if self._is_doable_pair(start, target) and self._is_challenging_pair(start, target)
-            ]
-            doable_only = [
-                start for start in unused_starts
-                if self._is_doable_pair(start, target)
-            ]
-            challenging_only = [
-                start for start in unused_starts
-                if self._is_challenging_pair(start, target)
-            ]
-
+            challenging_and_doable = [start for start in unused_starts if self._is_doable_pair(start, target) and self._is_challenging_pair(start, target)]
+            doable_only = [start for start in unused_starts if self._is_doable_pair(start, target)]
+            challenging_only = [start for start in unused_starts if self._is_challenging_pair(start, target)]
             candidates = challenging_and_doable or doable_only or challenging_only or unused_starts
             start_choice = self.random.choice(candidates)
             unused_starts.remove(start_choice)
@@ -438,9 +445,7 @@ class WikipelagoWorld(World):
                 lambda state, need=needed_round_access: state.has("Round Access", self.player, need),
             )
 
-        self.multiworld.completion_condition[self.player] = (
-            lambda state: state.has("Victory", self.player)
-        )
+        self.multiworld.completion_condition[self.player] = lambda state: state.has("Victory", self.player)
 
     def fill_slot_data(self) -> dict[str, Any]:
         round_count = self.options.check_count.value
@@ -467,39 +472,3 @@ class WikipelagoWorld(World):
             },
             "item_ids": {name: data.code for name, data in item_table.items()},
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

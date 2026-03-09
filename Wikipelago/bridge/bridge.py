@@ -1,4 +1,4 @@
-﻿
+
 import argparse
 import asyncio
 import json
@@ -244,6 +244,27 @@ class APConnection:
             if parsed:
                 self.state.item_ids = parsed
 
+        checked_locations = packet.get("checked_locations", [])
+        if isinstance(checked_locations, list):
+            restored_checked: set[int] = set()
+            for loc in checked_locations:
+                try:
+                    restored_checked.add(int(loc))
+                except Exception:
+                    pass
+            self.state.checked_locations = restored_checked
+
+            restored_round_index = 0
+            for round_loc in self.state.location_round_ids:
+                if round_loc in restored_checked:
+                    restored_round_index += 1
+                else:
+                    break
+            self.state.round_index = min(restored_round_index, self.state.check_count)
+
+            if self.state.location_grand_goal and self.state.location_grand_goal in restored_checked:
+                self.state.boss_completed = True
+                self.state.goal_status_sent = True
     @staticmethod
     def _to_ws_url(server: str) -> str:
         cleaned = server.replace("ws://", "").replace("wss://", "").replace("http://", "").replace("https://", "").strip("/")
@@ -566,6 +587,7 @@ def launch() -> None:
 
 if __name__ == "__main__":
     launch()
+
 
 
 

@@ -1,6 +1,6 @@
 name: WikiTester
 game: Wikipelago
-description: Wikipelago entertainment-only template
+description: Wikipelago template with expanded category toggles
 
 Wikipelago:
   progression_balancing: 50
@@ -10,3 +10,17 @@ Wikipelago:
   rounds_per_unlock: 5
   random_goal_article: false
   goal_article_preset: dark_souls
+
+  include_video_games: true
+  include_board_games: true
+  include_movies: true
+  include_tv_shows: true
+  include_anime_manga: true
+  include_sports: true
+  include_science_space: true
+  include_technology: true
+  include_history: true
+  include_geography: true
+  include_food_cuisine: true
+  include_art_literature: true
+  include_mythology_folklore: true
