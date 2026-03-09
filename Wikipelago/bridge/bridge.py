@@ -1,0 +1,579 @@
+﻿
+import argparse
+import asyncio
+import json
+import logging
+import os
+import time
+import urllib.parse
+import urllib.request
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import websockets
+from aiohttp import web
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+LOG = logging.getLogger("wikipelago-cloud")
+
+DEFAULT_ITEMS = {
+    "Knowledge Fragment": 1_870_001,
+    "Back Button": 1_870_002,
+    "Wiki Compass": 1_870_003,
+    "Ctrl+F Lens": 1_870_004,
+    "Round Access": 1_870_007,
+}
+
+SESSION_TTL_SECONDS = 60 * 60 * 6
+
+
+def normalize_title(title: str) -> str:
+    return " ".join(title.replace("_", " ").strip().split()).casefold()
+
+
+@dataclass
+class SessionState:
+    connected_to_ap: bool = False
+    ap_server: str = ""
+    slot_name: str = ""
+    check_count: int = 10
+    required_fragments: int = 8
+    start_rounds_unlocked: int = 5
+    rounds_per_unlock: int = 5
+    goal_required_round_access: int = 0
+    round_pairs: list[dict[str, str]] = field(default_factory=lambda: [{"start": "Wikipedia", "target": "Philosophy"}])
+    location_round_ids: list[int] = field(default_factory=list)
+    location_grand_goal: int | None = None
+    item_ids: dict[str, int] = field(default_factory=lambda: DEFAULT_ITEMS.copy())
+    received_items: list[int] = field(default_factory=list)
+    checked_locations: set[int] = field(default_factory=set)
+    round_index: int = 0
+    clicks_used: int = 0
+    last_page: str = ""
+    warmer_colder: str | None = None
+    last_distance_estimate: int | None = None
+    boss_completed: bool = False
+    goal_status_sent: bool = False
+    last_error: str = ""
+    last_seen: float = field(default_factory=lambda: time.time())
+
+    def current_target(self) -> str:
+        if self.round_index >= len(self.round_pairs):
+            return self.round_pairs[-1]["target"] if self.round_pairs else ""
+        return self.round_pairs[self.round_index]["target"]
+
+    def goal_article(self) -> str:
+        return self.round_pairs[-1]["target"] if self.round_pairs else ""
+
+    def fragments(self) -> int:
+        fragment_id = self.item_ids.get("Knowledge Fragment", DEFAULT_ITEMS["Knowledge Fragment"])
+        return sum(1 for item in self.received_items if item == fragment_id)
+
+    def round_access_count(self) -> int:
+        round_access_id = self.item_ids.get("Round Access", DEFAULT_ITEMS["Round Access"])
+        return sum(1 for item in self.received_items if item == round_access_id)
+
+    def has_item(self, name: str) -> bool:
+        item_id = self.item_ids.get(name, DEFAULT_ITEMS.get(name, -1))
+        return item_id in self.received_items
+
+    def boss_ready(self) -> bool:
+        return (
+            self.fragments() >= self.required_fragments
+            and self.round_access_count() >= self.goal_required_round_access
+        )
+
+    def unlocked_rounds(self) -> int:
+        step = max(1, self.rounds_per_unlock)
+        unlock_items = self.round_access_count()
+        return min(self.check_count, self.start_rounds_unlocked + (unlock_items * step))
+
+    def to_status(self) -> dict[str, Any]:
+        return {
+            "connected_to_ap": self.connected_to_ap,
+            "ap_server": self.ap_server,
+            "slot_name": self.slot_name,
+            "current_target": self.current_target(),
+            "goal_article": self.goal_article(),
+            "round": min(self.round_index + 1, self.check_count),
+            "check_count": self.check_count,
+            "clicks_used": self.clicks_used,
+            "fragments": self.fragments(),
+            "required_fragments": self.required_fragments,
+            "start_rounds_unlocked": self.start_rounds_unlocked,
+            "rounds_per_unlock": self.rounds_per_unlock,
+            "goal_required_round_access": self.goal_required_round_access,
+            "unlocked_rounds": self.unlocked_rounds(),
+            "back_button_unlocked": self.has_item("Back Button"),
+            "ctrl_f_unlocked": self.has_item("Ctrl+F Lens"),
+            "compass_unlocked": self.has_item("Wiki Compass"),
+            "warmer_colder": self.warmer_colder,
+            "boss_ready": self.boss_ready(),
+            "boss_completed": self.boss_completed,
+            "last_error": self.last_error,
+        }
+
+
+class APConnection:
+    def __init__(self, state: SessionState):
+        self.state = state
+        self.ws: Any = None
+        self.reader_task: asyncio.Task | None = None
+        self.send_lock = asyncio.Lock()
+        self.server = ""
+        self.slot_name = ""
+        self.password = ""
+        self.items_seen = 0
+        self.link_cache: dict[str, set[str]] = {}
+
+    async def connect(self, server: str, slot_name: str, password: str = "") -> None:
+        self.server = server
+        self.slot_name = slot_name
+        self.password = password
+
+        self.state.ap_server = server
+        self.state.slot_name = slot_name
+        self.state.connected_to_ap = False
+        self.state.last_error = ""
+        self.state.round_index = 0
+        self.state.checked_locations.clear()
+        self.state.received_items.clear()
+        self.state.boss_completed = False
+        self.state.goal_status_sent = False
+        self.state.warmer_colder = None
+        self.state.last_distance_estimate = None
+        self.items_seen = 0
+        self.link_cache.clear()
+
+        if self.reader_task and not self.reader_task.done():
+            self.reader_task.cancel()
+            try:
+                await self.reader_task
+            except Exception:
+                pass
+
+        self.reader_task = asyncio.create_task(self._connection_loop())
+
+    async def _connection_loop(self) -> None:
+        while True:
+            try:
+                ws_url = self._to_ws_url(self.server)
+                async with websockets.connect(ws_url, ping_interval=20, ping_timeout=20, max_size=2**22) as ws:
+                    self.ws = ws
+                    await self._handshake(ws)
+                    async for raw in ws:
+                        await self._handle_message(raw)
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                self.state.connected_to_ap = False
+                self.state.last_error = str(exc)
+                await asyncio.sleep(2)
+
+    async def _handshake(self, ws: Any) -> None:
+        room_info_raw = await ws.recv()
+        await self._handle_message(room_info_raw)
+
+        connect_packet = {
+            "cmd": "Connect",
+            "password": self.password,
+            "name": self.slot_name,
+            "game": "Wikipelago",
+            "uuid": f"wikipelago-cloud-{uuid.uuid4()}",
+            "version": {"major": 0, "minor": 6, "build": 6, "class": "Version"},
+            "items_handling": 7,
+            "tags": ["AP", "SlotData"],
+            "slot_data": True,
+        }
+        await ws.send(json.dumps([connect_packet]))
+
+    async def _handle_message(self, raw: str) -> None:
+        try:
+            packets = json.loads(raw)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(packets, list):
+            return
+
+        for packet in packets:
+            cmd = packet.get("cmd")
+            if cmd == "Connected":
+                self.state.connected_to_ap = True
+                self.state.last_error = ""
+                self._apply_connected(packet)
+            elif cmd == "ConnectionRefused":
+                self.state.last_error = f"ConnectionRefused: {packet.get('errors', [])}"
+                raise RuntimeError(self.state.last_error)
+            elif cmd == "ReceivedItems":
+                items = packet.get("items", [])
+                index = int(packet.get("index", 0))
+                start = max(self.items_seen - index, 0)
+                for item in items[start:]:
+                    self.state.received_items.append(int(item.get("item")))
+                self.items_seen = max(self.items_seen, index + len(items))
+                await self.try_finish_boss()
+
+    def _apply_connected(self, packet: dict[str, Any]) -> None:
+        slot_data = packet.get("slot_data") or {}
+
+        pairs = slot_data.get("round_pairs")
+        if isinstance(pairs, list) and pairs:
+            self.state.round_pairs = pairs
+
+        self.state.check_count = int(slot_data.get("check_count", len(self.state.round_pairs)))
+        self.state.required_fragments = int(slot_data.get("required_fragments", self.state.required_fragments))
+        self.state.start_rounds_unlocked = int(slot_data.get("start_rounds_unlocked", self.state.start_rounds_unlocked))
+        self.state.rounds_per_unlock = int(slot_data.get("rounds_per_unlock", self.state.rounds_per_unlock))
+        self.state.goal_required_round_access = int(slot_data.get("goal_required_round_access", self.state.goal_required_round_access))
+
+        location_ids = slot_data.get("location_ids", {})
+        self.state.location_round_ids = [int(v) for v in location_ids.get("rounds", [])]
+        grand_goal = location_ids.get("grand_goal")
+        self.state.location_grand_goal = int(grand_goal) if grand_goal is not None else None
+
+        item_ids = slot_data.get("item_ids")
+        if isinstance(item_ids, dict):
+            parsed: dict[str, int] = {}
+            for k, v in item_ids.items():
+                try:
+                    parsed[str(k)] = int(v)
+                except Exception:
+                    pass
+            if parsed:
+                self.state.item_ids = parsed
+
+    @staticmethod
+    def _to_ws_url(server: str) -> str:
+        cleaned = server.replace("ws://", "").replace("wss://", "").replace("http://", "").replace("https://", "").strip("/")
+        scheme = "wss" if cleaned.startswith("archipelago.gg") else "ws"
+        return f"{scheme}://{cleaned}"
+
+    async def send_location_checks(self, location_ids: list[int]) -> None:
+        if not location_ids or self.ws is None:
+            return
+        payload = [{"cmd": "LocationChecks", "locations": location_ids}]
+        async with self.send_lock:
+            await self.ws.send(json.dumps(payload))
+        self.state.checked_locations.update(location_ids)
+
+    def _fetch_page_links(self, title: str) -> set[str]:
+        norm = normalize_title(title)
+        cached = self.link_cache.get(norm)
+        if cached is not None:
+            return cached
+
+        links: set[str] = set()
+        plcontinue: str | None = None
+        pages_fetched = 0
+
+        while pages_fetched < 2:
+            params: dict[str, str] = {
+                "action": "query",
+                "prop": "links",
+                "titles": title,
+                "redirects": "1",
+                "plnamespace": "0",
+                "pllimit": "max",
+                "format": "json",
+            }
+            if plcontinue:
+                params["plcontinue"] = plcontinue
+
+            url = "https://en.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params)
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "WikipelagoBridge/1.0 (local bridge)",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=8) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+
+            pages = payload.get("query", {}).get("pages", {})
+            for page_data in pages.values():
+                for link in page_data.get("links", []):
+                    link_title = str(link.get("title", "")).strip()
+                    if link_title:
+                        links.add(normalize_title(link_title))
+
+            plcontinue = payload.get("continue", {}).get("plcontinue")
+            pages_fetched += 1
+            if not plcontinue:
+                break
+
+        self.link_cache[norm] = links
+        return links
+
+    async def _estimate_click_distance(self, page_title: str, target_title: str) -> int | None:
+        page_norm = normalize_title(page_title)
+        target_norm = normalize_title(target_title)
+        if page_norm == target_norm:
+            return 0
+
+        try:
+            page_links = await asyncio.to_thread(self._fetch_page_links, page_title)
+            if target_norm in page_links:
+                return 1
+
+            target_links = await asyncio.to_thread(self._fetch_page_links, target_title)
+            if page_links.intersection(target_links):
+                return 2
+            return 3
+        except Exception:
+            return None
+
+    async def _update_compass_hint(self, page_title: str, target_title: str) -> None:
+        if not self.state.has_item("Wiki Compass"):
+            self.state.warmer_colder = None
+            self.state.last_distance_estimate = None
+            return
+
+        estimate = await self._estimate_click_distance(page_title, target_title)
+        if estimate is None:
+            self.state.warmer_colder = "No signal"
+            return
+        if estimate == 0:
+            self.state.warmer_colder = "On target"
+            self.state.last_distance_estimate = 0
+            return
+
+        previous = self.state.last_distance_estimate
+        if previous is None:
+            self.state.warmer_colder = "Calibrating"
+        elif estimate < previous:
+            self.state.warmer_colder = "Warmer"
+        elif estimate > previous:
+            self.state.warmer_colder = "Colder"
+        else:
+            self.state.warmer_colder = "Same"
+        self.state.last_distance_estimate = estimate
+
+    async def send_goal_status(self) -> None:
+        if self.ws is None:
+            return
+        # Archipelago ClientStatus.CLIENT_GOAL
+        payload = [{"cmd": "StatusUpdate", "status": 30}]
+        async with self.send_lock:
+            await self.ws.send(json.dumps(payload))
+        self.state.goal_status_sent = True
+        LOG.info("Sent AP goal status update")
+
+    async def ensure_goal_status_if_complete(self) -> None:
+        if self.state.goal_status_sent:
+            return
+        if self.state.location_grand_goal and self.state.location_grand_goal in self.state.checked_locations:
+            await self.send_goal_status()
+            return
+        if self.state.location_round_ids and all(loc in self.state.checked_locations for loc in self.state.location_round_ids):
+            await self.send_goal_status()
+
+    async def on_page_check(self, page_title: str, clicks_used: int) -> dict[str, Any]:
+        self.state.last_seen = time.time()
+        self.state.last_page = page_title
+        self.state.clicks_used = clicks_used
+
+        target = self.state.current_target()
+        await self._update_compass_hint(page_title, target)
+        matched = normalize_title(page_title) == normalize_title(target)
+
+        result: dict[str, Any] = {
+            "matched": matched,
+            "target": target,
+            "advanced": False,
+            "locked": False,
+            "boss_completed": self.state.boss_completed,
+        }
+
+        if matched and self.state.round_index < self.state.check_count and self.state.location_round_ids:
+            round_number = self.state.round_index + 1
+            if round_number > self.state.unlocked_rounds():
+                result["locked"] = True
+            else:
+                round_id = self.state.location_round_ids[self.state.round_index]
+                await self.send_location_checks([round_id])
+                self.state.round_index += 1
+                result["advanced"] = True
+
+        await self.try_finish_boss()
+        await self.ensure_goal_status_if_complete()
+        result["status"] = self.state.to_status()
+        result["next_target"] = self.state.current_target()
+        return result
+
+    async def try_finish_boss(self) -> None:
+        if self.state.boss_completed:
+            return
+        if not self.state.boss_ready():
+            return
+        if normalize_title(self.state.last_page) != normalize_title(self.state.goal_article()):
+            return
+
+        if self.state.location_grand_goal:
+            await self.send_location_checks([self.state.location_grand_goal])
+
+        remaining = [loc for loc in self.state.location_round_ids if loc not in self.state.checked_locations]
+        if remaining:
+            await self.send_location_checks(remaining)
+
+        self.state.boss_completed = True
+        await self.send_goal_status()
+
+
+@dataclass
+class Session:
+    id: str
+    state: SessionState
+    conn: APConnection
+
+
+class SessionManager:
+    def __init__(self):
+        self.sessions: dict[str, Session] = {}
+
+    def create(self) -> Session:
+        sid = uuid.uuid4().hex
+        state = SessionState()
+        session = Session(id=sid, state=state, conn=APConnection(state))
+        self.sessions[sid] = session
+        return session
+
+    def get(self, sid: str) -> Session | None:
+        session = self.sessions.get(sid)
+        if session:
+            session.state.last_seen = time.time()
+        return session
+
+    async def gc(self) -> None:
+        while True:
+            now = time.time()
+            stale = [sid for sid, session in self.sessions.items() if now - session.state.last_seen > SESSION_TTL_SECONDS]
+            for sid in stale:
+                session = self.sessions.pop(sid)
+                if session.conn.reader_task and not session.conn.reader_task.done():
+                    session.conn.reader_task.cancel()
+            await asyncio.sleep(120)
+
+class App:
+    def __init__(self, web_root: Path):
+        self.web_root = web_root
+        self.sessions = SessionManager()
+
+    async def index(self, request: web.Request) -> web.StreamResponse:
+        return web.FileResponse(self.web_root / "index.html")
+
+    async def health(self, request: web.Request) -> web.StreamResponse:
+        return web.json_response({"ok": True, "sessions": len(self.sessions.sessions)})
+
+    async def create_session(self, request: web.Request) -> web.StreamResponse:
+        session = self.sessions.create()
+        return web.json_response({"ok": True, "session_id": session.id})
+
+    async def connect_session(self, request: web.Request) -> web.StreamResponse:
+        sid = request.match_info["sid"]
+        session = self.sessions.get(sid)
+        if not session:
+            return web.json_response({"ok": False, "error": "invalid session"}, status=404)
+
+        data = await request.json()
+        server = str(data.get("server", "")).strip()
+        slot_name = str(data.get("slot_name", "")).strip()
+        password = str(data.get("password", "")).strip()
+
+        if not server or not slot_name:
+            return web.json_response({"ok": False, "error": "server and slot_name are required"}, status=400)
+
+        await session.conn.connect(server, slot_name, password)
+        return web.json_response({"ok": True})
+
+    async def session_status(self, request: web.Request) -> web.StreamResponse:
+        sid = request.match_info["sid"]
+        session = self.sessions.get(sid)
+        if not session:
+            return web.json_response({"ok": False, "error": "invalid session"}, status=404)
+        return web.json_response({"ok": True, "status": session.state.to_status()})
+
+    async def session_check(self, request: web.Request) -> web.StreamResponse:
+        sid = request.match_info["sid"]
+        session = self.sessions.get(sid)
+        if not session:
+            return web.json_response({"ok": False, "error": "invalid session"}, status=404)
+
+        data = await request.json()
+        page_title = str(data.get("page_title", "")).strip()
+        clicks_used = int(data.get("clicks_used", 0))
+
+        if not page_title:
+            return web.json_response({"ok": False, "error": "page_title is required"}, status=400)
+
+        result = await session.conn.on_page_check(page_title, clicks_used)
+        return web.json_response({"ok": True, **result})
+
+    def build(self) -> web.Application:
+        app = web.Application()
+        app.router.add_get("/", self.index)
+        app.router.add_get("/health", self.health)
+        app.router.add_post("/api/session", self.create_session)
+        app.router.add_post("/api/session/{sid}/connect", self.connect_session)
+        app.router.add_get("/api/session/{sid}/status", self.session_status)
+        app.router.add_post("/api/session/{sid}/check", self.session_check)
+        app.router.add_static("/static/", str(self.web_root), show_index=False, append_version=True)
+
+        async def startup(_: web.Application) -> None:
+            app["gc_task"] = asyncio.create_task(self.sessions.gc())
+
+        async def cleanup(_: web.Application) -> None:
+            task = app.get("gc_task")
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except Exception:
+                    pass
+
+        app.on_startup.append(startup)
+        app.on_cleanup.append(cleanup)
+        return app
+
+
+async def main_async(args: argparse.Namespace) -> None:
+    web_root = Path(__file__).resolve().parent.parent / "web"
+    application = App(web_root).build()
+
+    runner = web.AppRunner(application)
+    await runner.setup()
+    site = web.TCPSite(runner, args.host, args.port)
+    await site.start()
+
+    LOG.info(f"Wikipelago cloud app running on http://{args.host}:{args.port}")
+    while True:
+        await asyncio.sleep(3600)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Wikipelago cloud app")
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "5000")))
+    return parser.parse_args()
+
+
+def launch() -> None:
+    args = parse_args()
+    asyncio.run(main_async(args))
+
+
+if __name__ == "__main__":
+    launch()
+
+
+
+
+
+
+
+
+
+
+

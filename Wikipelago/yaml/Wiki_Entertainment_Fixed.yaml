@@ -1,0 +1,12 @@
+name: WikiTester
+game: Wikipelago
+description: Wikipelago entertainment-only template
+
+Wikipelago:
+  progression_balancing: 50
+  check_count: 50
+  required_fragments: 8
+  start_rounds_unlocked: 8
+  rounds_per_unlock: 5
+  random_goal_article: false
+  goal_article_preset: dark_souls

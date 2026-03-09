@@ -1,0 +1,9 @@
+﻿{
+  "name": "Wikipelago",
+  "display_name": "Wikipelago",
+  "author": "micha + codex",
+  "version": "0.1.0",
+  "compatible_version": 6,
+  "description": "Navigate Wikipedia start-to-target rounds in Archipelago.",
+  "homepage": "https://archipelago.gg"
+}
