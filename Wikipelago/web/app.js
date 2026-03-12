@@ -1,4 +1,4 @@
-const APP_VERSION = "2026.03.08.4";
+const APP_VERSION = "2026.03.12.2";
 console.log("Wikipelago web version", APP_VERSION);
 
 const state = {
@@ -11,8 +11,6 @@ const state = {
 
 const el = {
   connBadge: document.getElementById("connBadge"),
-  articleInput: document.getElementById("articleInput"),
-  openBtn: document.getElementById("openBtn"),
   articleTitle: document.getElementById("articleTitle"),
   articleBody: document.getElementById("articleBody"),
   serverInput: document.getElementById("serverInput"),
@@ -41,6 +39,10 @@ function toast(text, kind = "ok") {
   setTimeout(() => { el.toast.className = "toast hidden"; }, 2200);
 }
 
+function normalizeTitle(title) {
+  return String(title || "").replace(/_/g, " ").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 async function api(path, method = "GET", body = null, retryOnInvalidSession = true) {
   const options = { method, headers: { "Content-Type": "application/json" } };
   if (body) options.body = JSON.stringify(body);
@@ -48,8 +50,6 @@ async function api(path, method = "GET", body = null, retryOnInvalidSession = tr
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.ok === false) {
     const errText = data.error || `HTTP ${res.status}`;
-
-    // Server-side sessions are in-memory; on restart/deploy, browser session IDs go stale.
     if (retryOnInvalidSession && String(errText).toLowerCase() === "invalid session") {
       state.sessionId = "";
       localStorage.removeItem("wikipelago_session_id");
@@ -57,7 +57,6 @@ async function api(path, method = "GET", body = null, retryOnInvalidSession = tr
       const fixedPath = path.replace(/\/api\/session\/[^/]+/, `/api/session/${state.sessionId}`);
       return api(fixedPath, method, body, false);
     }
-
     throw new Error(errText);
   }
   return data;
@@ -88,15 +87,8 @@ function updateHUD(status) {
 
   el.clicksText.textContent = String(state.clicksUsed);
   el.fragmentsText.textContent = `${status.fragments}/${status.required_fragments}`;
-  if (!status.compass_unlocked) {
-    el.compassHint.textContent = "Locked";
-  } else {
-    el.compassHint.textContent = status.warmer_colder || "Calibrating";
-  }
-
-  const p = Math.max(0, Math.min(100, (status.round / Math.max(status.check_count, 1)) * 100));
-  el.roundProgress.style.width = `${p}%`;
-
+  el.compassHint.textContent = status.compass_unlocked ? (status.warmer_colder || "Calibrating") : "Locked";
+  el.roundProgress.style.width = `${Math.max(0, Math.min(100, (status.round / Math.max(status.check_count, 1)) * 100))}%`;
   el.backItem.textContent = status.back_button_unlocked ? "Unlocked" : "Locked";
   el.searchItem.textContent = status.ctrl_f_unlocked ? "Unlocked" : "Locked";
   el.compassItem.textContent = status.compass_unlocked ? "Unlocked" : "Locked";
@@ -105,9 +97,9 @@ function updateHUD(status) {
     toast("GOAL COMPLETE! Seed finished.", "ok");
     state.announcedGoalComplete = true;
   }
-
   if (status.last_error) toast(status.last_error, "warn");
 }
+
 async function pollStatus() {
   try {
     await ensureSession();
@@ -146,14 +138,14 @@ async function fetchWikiHtml(title) {
   return data.parse.text;
 }
 
-async function openArticle(title, countAsClick = false) {
+async function openArticle(title, options = {}) {
   if (!title) return;
+  const { countAsClick = false } = options;
+
   try {
     const html = await fetchWikiHtml(title);
     state.currentTitle = title;
     el.articleTitle.textContent = title;
-    el.articleInput.value = title;
-
     el.articleBody.innerHTML = html;
     sanitizeHtml(el.articleBody);
     rewriteLinks(el.articleBody);
@@ -177,16 +169,11 @@ async function openArticle(title, countAsClick = false) {
   }
 }
 
-el.openBtn.addEventListener("click", () => openArticle(el.articleInput.value.trim(), false));
-el.articleInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") openArticle(el.articleInput.value.trim(), false);
-});
-
 el.articleBody.addEventListener("click", (e) => {
   const a = e.target.closest("a[data-title]");
   if (!a) return;
   e.preventDefault();
-  openArticle(a.dataset.title, true);
+  openArticle(a.dataset.title, { countAsClick: true });
 });
 
 el.connectBtn.addEventListener("click", async () => {
@@ -233,7 +220,7 @@ window.addEventListener("popstate", (e) => {
     return;
   }
   const title = e.state?.title;
-  if (title) openArticle(title, false);
+  if (title) openArticle(title, { countAsClick: false });
 });
 
 setInterval(pollStatus, 1500);
@@ -241,18 +228,5 @@ setInterval(pollStatus, 1500);
 (async () => {
   await ensureSession();
   await pollStatus();
-  openArticle("Wikipedia", false);
+  openArticle("Wikipedia", { countAsClick: false });
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-

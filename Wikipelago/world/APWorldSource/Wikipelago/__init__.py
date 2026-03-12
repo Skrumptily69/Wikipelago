@@ -77,19 +77,22 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
         "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "pokemon", "dark souls",
         "elden ring", "halo", "mario", "baldur's gate", "stardew valley", "hollow knight", "celeste",
         "among us", "tetris", "call of duty", "resident evil", "final fantasy", "metroid", "portal",
+        "god of war", "mass effect", "bioshock", "terraria", "balatro", "slay the spire",
     ),
     "board_games": (
         "board game", "card game", "chess", "checkers", "catan", "monopoly", "mahjong", "scrabble",
-        "go (game)", "dungeons & dragons", "risk (game)", "ticket to ride (board game)", "carcassonne (board game)",
+        "go (game)", "dungeons & dragons", "risk (game)", "ticket to ride (board game)",
+        "carcassonne (board game)",
     ),
     "movies": (
-        "(film)", "film", "movie", "star wars", "the dark knight", "the matrix", "lord of the rings",
+        "(film)", " film", "movie", "star wars", "the dark knight", "the matrix", "lord of the rings",
         "avengers", "jurassic park", "toy story", "inception", "interstellar", "dune", "oppenheimer",
+        "barbie", "gladiator", "titanic", "moana", "frozen", "coco",
     ),
     "tv_shows": (
-        "(tv series)", "television series", "tv series", "television show", "breaking bad", "stranger things",
-        "game of thrones", "the simpsons", "spongebob", "avatar: the last airbender", "friends", "the office",
-        "the last of us (tv series)",
+        "(tv series)", "television series", "tv series", "television show", "breaking bad",
+        "stranger things", "game of thrones", "the simpsons", "spongebob", "avatar: the last airbender",
+        "friends", "the office", "better call saul", "bluey", "arcane", "house of the dragon",`r`n        "community", "futurama", "gilmore girls", "glee", "hannibal", "heartstopper", "mr. robot",`r`n        "ozark", "scrubs", "suits", "supernatural", "the good place", "the x-files",
     ),
     "anime_manga": (
         "anime", "manga", "naruto", "one piece", "dragon ball", "attack on titan", "death note",
@@ -97,36 +100,72 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     ),
     "sports": (
         "football", "basketball", "baseball", "soccer", "tennis", "olympic", "fifa", "nba", "nfl",
-        "champions league", "world cup", "formula one", "golf", "cricket", "wwe",
+        "champions league", "world cup", "formula one", "golf", "cricket", "wwe", "super bowl",
+        "wimbledon", "tour de france",
     ),
     "science_space": (
-        "astronomy", "planet", "galaxy", "black hole", "physics", "biology", "mathematics", "space telescope",
-        "apollo", "mars", "milky way", "quantum", "relativity", "dna", "fossil",
+        "astronomy", "planet", "galaxy", "black hole", "physics", "biology", "mathematics",
+        "space telescope", "apollo", "mars", "milky way", "quantum", "relativity", "dna", "fossil",
+        "solar system", "international space station",
     ),
     "technology": (
         "internet", "computer", "software", "website", "youtube", "google", "wikipedia", "smartphone",
         "artificial intelligence", "virtual reality", "social media", "web browser", "operating system",
+        "world wide web", "openai", "mozilla firefox", "google chrome", "microsoft edge",
     ),
     "history": (
-        "ancient", "history of", "war", "renaissance", "industrial revolution", "middle ages", "roman empire",
-        "world war", "cold war", "silk road", "black death", "moon landing",
+        "ancient", "history of", "war", "renaissance", "industrial revolution", "middle ages",
+        "roman empire", "world war", "cold war", "silk road", "black death", "moon landing",
+        "ancient egypt", "ancient greece",
     ),
     "geography": (
-        "mountain", "river", "desert", "ocean", "national park", "city", "country", "continent",
-        "waterfall", "island", "volcano", "forest", "landmark",
+        "mountain", "river", "desert", "ocean", "national park", "country", "continent",
+        "waterfall", "island", "volcano", "forest", "landmark", "amazon rainforest", "mount everest",
+        "eiffel tower", "taj mahal",
     ),
     "food_cuisine": (
-        "cuisine", "dish", "food", "pizza", "sushi", "pasta", "burger", "taco", "ramen", "chocolate",
-        "coffee", "tea", "ice cream", "sandwich",
+        "cuisine", "dish", "food", "pizza", "sushi", "pasta", "burger", "taco", "ramen",
+        "chocolate", "coffee", "tea", "ice cream", "sandwich",
     ),
     "art_literature": (
-        "novel", "book", "author", "poetry", "painting", "sculpture", "museum", "theater", "literature",
-        "shakespeare", "mona lisa", "van gogh", "picasso", "harry potter",
+        "novel", "book", "author", "poetry", "painting", "sculpture", "museum", "theater",
+        "literature", "shakespeare", "mona lisa", "van gogh", "picasso", "harry potter",
+        "the hobbit", "pride and prejudice",
     ),
     "mythology_folklore": (
         "mythology", "folklore", "greek god", "norse", "myth", "legend", "dragon", "vampire",
         "werewolf", "mermaid", "odin", "zeus", "athena",
     ),
+}
+
+EXACT_TITLE_TOPICS: dict[str, str] = {
+    "super bowl": "sports",
+    "the matrix": "movies",
+    "breaking bad": "tv_shows",
+    "stranger things": "tv_shows",
+    "friends": "tv_shows",
+    "spongebob squarepants": "tv_shows",
+    "the simpsons": "tv_shows",
+    "game of thrones": "tv_shows",
+    "avatar: the last airbender": "tv_shows",
+    "bluey": "tv_shows",
+    "naruto": "anime_manga",
+    "one piece": "anime_manga",
+    "death note": "anime_manga",
+    "attack on titan": "anime_manga",
+    "chess": "board_games",
+    "checkers": "board_games",
+    "catan": "board_games",
+    "go": "board_games",
+    "minecraft": "video_games",
+    "fortnite": "video_games",
+    "roblox": "video_games",
+    "dark souls": "video_games",
+    "elden ring": "video_games",
+    "halo: combat evolved": "video_games",
+    "wikipedia": "technology",
+    "google": "technology",
+    "youtube": "technology",
 }
 
 
@@ -252,12 +291,23 @@ class WikipelagoWorld(World):
         tokens = {tok for tok in re.findall(r"[A-Za-z]+", title.lower()) if len(tok) > 2}
         return {tok for tok in tokens if tok not in STOPWORDS}
 
-    def _infer_topic(self, title: str) -> str:
-        lowered = title.lower()
+    def _infer_topic(self, title: str) -> str | None:
+        lowered = title.lower().strip()
+        exact_match = EXACT_TITLE_TOPICS.get(lowered)
+        if exact_match:
+            return exact_match
+        if "(film)" in lowered:
+            return "movies"
+        if "(tv series)" in lowered or "television series" in lowered:
+            return "tv_shows"
+        if "(video game)" in lowered:
+            return "video_games"
+        if "(board game)" in lowered:
+            return "board_games"
         for topic, keywords in TOPIC_KEYWORDS.items():
             if any(keyword in lowered for keyword in keywords):
                 return topic
-        return "video_games"
+        return None
 
     def _selected_topics(self) -> set[str]:
         selected: set[str] = set()
@@ -293,7 +343,6 @@ class WikipelagoWorld(World):
         return [title for title in pool if self._infer_topic(title) in selected_topics]
 
     def _is_doable_pair(self, start: str, target: str) -> bool:
-        # Keep pairing permissive with broad category mixes.
         return True
 
     def _is_challenging_pair(self, start: str, target: str) -> bool:
@@ -319,15 +368,20 @@ class WikipelagoWorld(World):
             )
 
         pool = list(dict.fromkeys(ENTERTAINMENT_ARTICLE_POOL))
-        filtered_pool = [title for title in pool if self._is_reasonable_title(title) and self._looks_common_knowledge(title)]
+        filtered_pool = [
+            title for title in pool
+            if self._is_reasonable_title(title)
+            and self._looks_common_knowledge(title)
+            and self._infer_topic(title) is not None
+        ]
         filtered_pool = self._filter_pool_by_topics(filtered_pool, selected_topics)
 
         needed_total = max(2, round_count * 2)
         if len(filtered_pool) < needed_total:
             raise Exception(
-                "Wikipelago entertainment-only mode failed: "
+                "Wikipelago category filtering failed: "
                 f"need at least {needed_total} unique titles for {round_count} rounds, "
-                f"but only have {len(filtered_pool)} after filters and category toggles."
+                f"but only have {len(filtered_pool)} after applying enabled categories."
             )
 
         if self.options.random_goal_article.value:
@@ -347,7 +401,6 @@ class WikipelagoWorld(World):
 
         remaining = [title for title in filtered_pool if title != self.goal_article]
         needed_non_goal = max(0, (2 * round_count) - 1)
-
         if len(remaining) < needed_non_goal:
             raise Exception(
                 "Wikipelago strict no-repeat mode failed: "
@@ -359,13 +412,15 @@ class WikipelagoWorld(World):
         picks = self.random.sample(remaining, needed_non_goal)
         non_final_targets = picks[: round_count - 1]
         base_starts = picks[round_count - 1:]
-
         targets = non_final_targets + [self.goal_article]
         unused_starts = list(base_starts)
         pairs: list[dict[str, str]] = []
 
         for target in targets:
-            challenging_and_doable = [start for start in unused_starts if self._is_doable_pair(start, target) and self._is_challenging_pair(start, target)]
+            challenging_and_doable = [
+                start for start in unused_starts
+                if self._is_doable_pair(start, target) and self._is_challenging_pair(start, target)
+            ]
             doable_only = [start for start in unused_starts if self._is_doable_pair(start, target)]
             challenging_only = [start for start in unused_starts if self._is_challenging_pair(start, target)]
             candidates = challenging_and_doable or doable_only or challenging_only or unused_starts
@@ -388,7 +443,6 @@ class WikipelagoWorld(World):
         start_unlocked = min(self.options.start_rounds_unlocked.value, round_count)
         per_unlock = max(1, self.options.rounds_per_unlock.value)
         early_open = start_unlocked
-
         round_access_count = max(0, (round_count - early_open + per_unlock - 1) // per_unlock)
 
         mandatory_items = required_fragments + 3 + round_access_count
@@ -402,19 +456,15 @@ class WikipelagoWorld(World):
         pool: list[WikipelagoItem] = []
         for _ in range(required_fragments):
             pool.append(self.create_item("Knowledge Fragment"))
-
         pool.append(self.create_item("Back Button"))
         pool.append(self.create_item("Wiki Compass"))
         pool.append(self.create_item("Ctrl+F Lens"))
-
         for _ in range(round_access_count):
             pool.append(self.create_item("Round Access"))
-
         while len(pool) < round_count:
             pool.append(self.create_item("Footnote"))
 
         self.multiworld.itempool.extend(pool)
-
         grand_goal = self.multiworld.get_location("Grand Goal", self.player)
         grand_goal.place_locked_item(self.create_item("Victory"))
 
@@ -424,7 +474,6 @@ class WikipelagoWorld(World):
         start_unlocked = min(self.options.start_rounds_unlocked.value, round_count)
         per_unlock = max(1, self.options.rounds_per_unlock.value)
         early_open = start_unlocked
-
         goal_round_access = max(0, (round_count - start_unlocked + per_unlock - 1) // per_unlock)
 
         goal_location = self.multiworld.get_location("Grand Goal", self.player)
@@ -452,7 +501,6 @@ class WikipelagoWorld(World):
         required_fragments = min(self.options.required_fragments.value, round_count)
         start_unlocked = min(self.options.start_rounds_unlocked.value, round_count)
         per_unlock = max(1, self.options.rounds_per_unlock.value)
-
         round_location_ids = [
             self.location_name_to_id[f"Round {index} Complete"]
             for index in range(1, round_count + 1)
@@ -472,3 +520,6 @@ class WikipelagoWorld(World):
             },
             "item_ids": {name: data.code for name, data in item_table.items()},
         }
+
+
+
