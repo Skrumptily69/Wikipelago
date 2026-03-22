@@ -8,6 +8,7 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,8 +31,35 @@ SESSION_TTL_SECONDS = 60 * 60 * 6
 
 
 def normalize_title(title: str) -> str:
-    return " ".join(title.replace("_", " ").strip().split()).casefold()
+    spaced = " ".join(title.replace("_", " ").strip().split())
+    deaccented = "".join(ch for ch in unicodedata.normalize("NFKD", spaced) if not unicodedata.combining(ch))
+    return deaccented.casefold()
 
+
+TITLE_CANONICALS: dict[str, str] = {
+    normalize_title("Pokemon"): "Pok\u00e9mon",
+    normalize_title("Pokemon Red and Blue"): "Pok\u00e9mon Red and Blue",
+    normalize_title("Pokemon Gold and Silver"): "Pok\u00e9mon Gold and Silver",
+    normalize_title("Pokemon Scarlet and Violet"): "Pok\u00e9mon Scarlet and Violet",
+    normalize_title("Pokemon Yellow"): "Pok\u00e9mon Yellow",
+    normalize_title("Pokemon Ruby and Sapphire"): "Pok\u00e9mon Ruby and Sapphire",
+    normalize_title("Pokemon Diamond and Pearl"): "Pok\u00e9mon Diamond and Pearl",
+    normalize_title("Pokemon Black and White"): "Pok\u00e9mon Black and White",
+    normalize_title("Pokemon Sun and Moon"): "Pok\u00e9mon Sun and Moon",
+    normalize_title("Pokemon Legends: Arceus"): "Pok\u00e9mon Legends: Arceus",
+    normalize_title("Pokemon Go"): "Pok\u00e9mon Go",
+    normalize_title("Pokemon Trading Card Game"): "Pok\u00e9mon Trading Card Game",
+    normalize_title("La La Land (film)"): "La La Land",
+    normalize_title("Her (film)"): "Her (2013 film)",
+    normalize_title("Clue (board game)"): "Cluedo",
+}
+
+
+TITLE_ALIASES: dict[str, set[str]] = {
+    normalize_title("La La Land (film)"): {normalize_title("La La Land")},
+    normalize_title("Her (film)"): {normalize_title("Her (2013 film)"), normalize_title("Her")},
+    normalize_title("Clue (board game)"): {normalize_title("Cluedo")},
+}
 
 @dataclass
 class SessionState:
@@ -127,6 +155,7 @@ class APConnection:
         self.password = ""
         self.items_seen = 0
         self.link_cache: dict[str, set[str]] = {}
+        self.resolved_title_cache: dict[str, str] = {}
 
     async def connect(self, server: str, slot_name: str, password: str = "") -> None:
         self.server = server
@@ -146,6 +175,7 @@ class APConnection:
         self.state.last_distance_estimate = None
         self.items_seen = 0
         self.link_cache.clear()
+        self.resolved_title_cache.clear()
 
         if self.reader_task and not self.reader_task.done():
             self.reader_task.cancel()
@@ -220,7 +250,15 @@ class APConnection:
 
         pairs = slot_data.get("round_pairs")
         if isinstance(pairs, list) and pairs:
-            self.state.round_pairs = pairs
+            normalized_pairs: list[dict[str, str]] = []
+            for pair in pairs:
+                if not isinstance(pair, dict):
+                    continue
+                start = self._canonicalize_known_title(str(pair.get("start", "")).strip())
+                target = self._canonicalize_known_title(str(pair.get("target", "")).strip())
+                normalized_pairs.append({"start": start, "target": target})
+            if normalized_pairs:
+                self.state.round_pairs = normalized_pairs
 
         self.state.check_count = int(slot_data.get("check_count", len(self.state.round_pairs)))
         self.state.required_fragments = int(slot_data.get("required_fragments", self.state.required_fragments))
@@ -265,6 +303,9 @@ class APConnection:
             if self.state.location_grand_goal and self.state.location_grand_goal in restored_checked:
                 self.state.boss_completed = True
                 self.state.goal_status_sent = True
+
+        self._canonicalize_active_targets()
+
     @staticmethod
     def _to_ws_url(server: str) -> str:
         cleaned = server.replace("ws://", "").replace("wss://", "").replace("http://", "").replace("https://", "").strip("/")
@@ -278,6 +319,39 @@ class APConnection:
         async with self.send_lock:
             await self.ws.send(json.dumps(payload))
         self.state.checked_locations.update(location_ids)
+
+    @staticmethod
+    def _canonicalize_known_title(title: str) -> str:
+        return TITLE_CANONICALS.get(normalize_title(title), title)
+
+    def _canonicalize_title_sync(self, title: str) -> str:
+        norm = normalize_title(title)
+        cached = self.resolved_title_cache.get(norm)
+        if cached:
+            return cached
+
+        canonical = self._canonicalize_known_title(title)
+        try:
+            resolved = self._fetch_resolved_title(canonical)
+        except Exception:
+            resolved = canonical
+
+        self.resolved_title_cache[norm] = resolved
+        self.resolved_title_cache[normalize_title(resolved)] = resolved
+        return resolved
+
+    async def _canonicalize_title(self, title: str) -> str:
+        return await asyncio.to_thread(self._canonicalize_title_sync, title)
+
+    def _canonicalize_active_targets(self) -> None:
+        if not self.state.round_pairs:
+            return
+
+        active_index = min(self.state.round_index, max(len(self.state.round_pairs) - 1, 0))
+        for idx in {active_index, len(self.state.round_pairs) - 1}:
+            pair = self.state.round_pairs[idx]
+            pair["start"] = self._canonicalize_known_title(pair.get("start", ""))
+            pair["target"] = self._canonicalize_title_sync(pair.get("target", ""))
 
     def _fetch_page_links(self, title: str) -> set[str]:
         norm = normalize_title(title)
@@ -346,6 +420,53 @@ class APConnection:
         except Exception:
             return None
 
+
+    def _fetch_resolved_title(self, title: str) -> str:
+        params = {
+            "action": "query",
+            "titles": title,
+            "redirects": "1",
+            "format": "json",
+        }
+        url = "https://en.wikipedia.org/w/api.php?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "WikipelagoBridge/1.0 (local bridge)",
+                "Accept": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+
+        pages = payload.get("query", {}).get("pages", {})
+        for page_data in pages.values():
+            resolved = str(page_data.get("title", "")).strip()
+            if resolved:
+                return resolved
+        return title
+
+    async def _titles_match(self, page_title: str, target_title: str) -> bool:
+        page_norm = normalize_title(page_title)
+        target_norm = normalize_title(target_title)
+        if page_norm == target_norm:
+            return True
+
+        target_aliases = TITLE_ALIASES.get(target_norm, set())
+        if page_norm in target_aliases:
+            return True
+
+        page_aliases = TITLE_ALIASES.get(page_norm, set())
+        if target_norm in page_aliases:
+            return True
+
+        try:
+            resolved_page = await asyncio.to_thread(self._fetch_resolved_title, page_title)
+            resolved_target = await asyncio.to_thread(self._fetch_resolved_title, target_title)
+            return normalize_title(resolved_page) == normalize_title(resolved_target)
+        except Exception:
+            return False
+
     async def _update_compass_hint(self, page_title: str, target_title: str) -> None:
         if not self.state.has_item("Wiki Compass"):
             self.state.warmer_colder = None
@@ -396,9 +517,11 @@ class APConnection:
         self.state.last_page = page_title
         self.state.clicks_used = clicks_used
 
-        target = self.state.current_target()
+        target = await self._canonicalize_title(self.state.current_target())
+        if self.state.round_index < len(self.state.round_pairs):
+            self.state.round_pairs[self.state.round_index]["target"] = target
         await self._update_compass_hint(page_title, target)
-        matched = normalize_title(page_title) == normalize_title(target)
+        matched = await self._titles_match(page_title, target)
 
         result: dict[str, Any] = {
             "matched": matched,
@@ -429,7 +552,10 @@ class APConnection:
             return
         if not self.state.boss_ready():
             return
-        if normalize_title(self.state.last_page) != normalize_title(self.state.goal_article()):
+        goal_title = await self._canonicalize_title(self.state.goal_article())
+        if self.state.round_pairs:
+            self.state.round_pairs[-1]["target"] = goal_title
+        if not await self._titles_match(self.state.last_page, goal_title):
             return
 
         if self.state.location_grand_goal:
@@ -587,6 +713,11 @@ def launch() -> None:
 
 if __name__ == "__main__":
     launch()
+
+
+
+
+
 
 
 

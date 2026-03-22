@@ -74,7 +74,7 @@ BANNED_EXACT_TITLES: set[str] = {
 
 TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "video_games": (
-        "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "pokemon", "dark souls",
+        "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "Pokémon", "dark souls",
         "elden ring", "halo", "mario", "baldur's gate", "stardew valley", "hollow knight", "celeste",
         "among us", "tetris", "call of duty", "resident evil", "final fantasy", "metroid", "portal",
         "god of war", "mass effect", "bioshock", "terraria", "balatro", "slay the spire",
@@ -92,7 +92,9 @@ TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "tv_shows": (
         "(tv series)", "television series", "tv series", "television show", "breaking bad",
         "stranger things", "game of thrones", "the simpsons", "spongebob", "avatar: the last airbender",
-        "friends", "the office", "better call saul", "bluey", "arcane", "house of the dragon",`r`n        "community", "futurama", "gilmore girls", "glee", "hannibal", "heartstopper", "mr. robot",`r`n        "ozark", "scrubs", "suits", "supernatural", "the good place", "the x-files",
+        "friends", "the office", "better call saul", "bluey", "arcane", "house of the dragon",
+        "community", "futurama", "gilmore girls", "glee", "hannibal", "heartstopper", "mr. robot",
+        "ozark", "scrubs", "suits", "supernatural", "the good place", "the x-files",
     ),
     "anime_manga": (
         "anime", "manga", "naruto", "one piece", "dragon ball", "attack on titan", "death note",
@@ -176,7 +178,7 @@ def _preset_goal_name(option_value: int) -> str:
         2: "Dark Souls",
         3: "Elden Ring",
         4: "Super Mario Bros.",
-        5: "Pokemon Red and Blue",
+        5: "Pokémon Red and Blue",
         6: "Chess",
         7: "Catan",
         8: "The Dark Knight",
@@ -520,6 +522,8 @@ class WikipelagoWorld(World):
             },
             "item_ids": {name: data.code for name, data in item_table.items()},
         }
+
+
 
 
 

@@ -293,7 +293,7 @@ COMMON_ARTICLE_POOL: list[str] = [
     "Pac-Man",
     "Super Mario",
     "The Legend of Zelda",
-    "Pokemon",
+    "Pokémon",
     "Halo (franchise)",
     "Dark Souls",
     "Sekiro: Shadows Die Twice",
