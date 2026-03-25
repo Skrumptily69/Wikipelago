@@ -1,4 +1,4 @@
-COMMON_ARTICLE_POOL: list[str] = [
+﻿COMMON_ARTICLE_POOL: list[str] = [
     "Africa",
     "Antarctica",
     "Asia",
@@ -293,7 +293,7 @@ COMMON_ARTICLE_POOL: list[str] = [
     "Pac-Man",
     "Super Mario",
     "The Legend of Zelda",
-    "Pok�mon",
+    "Pokémon",
     "Halo (franchise)",
     "Dark Souls",
     "Sekiro: Shadows Die Twice",
@@ -432,3 +432,4 @@ COMMON_ARTICLE_POOL: list[str] = [
     "Vermont",
     "Wyoming",
 ]
+

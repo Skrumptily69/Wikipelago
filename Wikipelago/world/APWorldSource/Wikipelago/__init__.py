@@ -1,4 +1,4 @@
-from __future__ import annotations
+ï»¿from __future__ import annotations
 
 import re
 from typing import Any
@@ -74,7 +74,7 @@ BANNED_EXACT_TITLES: set[str] = {
 
 TOPIC_KEYWORDS: dict[str, tuple[str, ...]] = {
     "video_games": (
-        "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "Pokémon", "dark souls",
+        "video game", "minecraft", "fortnite", "roblox", "legend of zelda", "PokÃ©mon", "dark souls",
         "elden ring", "halo", "mario", "baldur's gate", "stardew valley", "hollow knight", "celeste",
         "among us", "tetris", "call of duty", "resident evil", "final fantasy", "metroid", "portal",
         "god of war", "mass effect", "bioshock", "terraria", "balatro", "slay the spire",
@@ -178,7 +178,7 @@ def _preset_goal_name(option_value: int) -> str:
         2: "Dark Souls",
         3: "Elden Ring",
         4: "Super Mario Bros.",
-        5: "Pokémon Red and Blue",
+        5: "PokÃ©mon Red and Blue",
         6: "Chess",
         7: "Catan",
         8: "The Dark Knight",
@@ -522,6 +522,7 @@ class WikipelagoWorld(World):
             },
             "item_ids": {name: data.code for name, data in item_table.items()},
         }
+
 
 
 

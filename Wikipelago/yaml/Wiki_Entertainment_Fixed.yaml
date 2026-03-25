@@ -1,4 +1,4 @@
-name: WikiTester
+﻿name: WikiTester
 game: Wikipelago
 description: Release template for Wikipelago
 
@@ -60,3 +60,4 @@ Wikipelago:
   include_food_cuisine: true
   include_art_literature: true
   include_mythology_folklore: true
+
