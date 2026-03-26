@@ -1,0 +1,27 @@
+﻿name: WikiFuzz003
+game: Wikipelago
+description: Auto-generated fuzz case
+
+Wikipelago:
+  progression_balancing: 15
+  check_count: 93
+  required_fragments: 11
+  start_rounds_unlocked: 6
+  rounds_per_unlock: 4
+  random_goal_article: True.ToLower()
+  goal_article_preset: game_of_thrones
+  searchsanity: False.ToLower()
+  search_starting_letters: etaoi
+  include_video_games: True.ToLower()
+  include_board_games: True.ToLower()
+  include_movies: False.ToLower()
+  include_tv_shows: False.ToLower()
+  include_anime_manga: False.ToLower()
+  include_sports: True.ToLower()
+  include_science_space: True.ToLower()
+  include_technology: True.ToLower()
+  include_history: False.ToLower()
+  include_geography: True.ToLower()
+  include_food_cuisine: True.ToLower()
+  include_art_literature: True.ToLower()
+  include_mythology_folklore: True.ToLower()

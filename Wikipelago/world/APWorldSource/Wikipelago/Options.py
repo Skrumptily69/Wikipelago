@@ -36,6 +36,20 @@ class RandomGoalArticle(Toggle):
     default = 0
 
 
+class Searchsanity(Toggle):
+    display_name = "Searchsanity"
+    default = 0
+
+
+class SearchStartingLetters(Choice):
+    display_name = "Search Starting Letters"
+    option_none = 0
+    option_all_vowels = 1
+    option_etaoi = 2
+    option_raise = 3
+    default = 0
+
+
 class IncludeVideoGames(Toggle):
     display_name = "Include Video Games"
     default = 1
@@ -133,6 +147,8 @@ class WikipelagoOptions(PerGameCommonOptions):
     start_rounds_unlocked: StartRoundsUnlocked
     rounds_per_unlock: RoundsPerUnlock
     random_goal_article: RandomGoalArticle
+    searchsanity: Searchsanity
+    search_starting_letters: SearchStartingLetters
     include_video_games: IncludeVideoGames
     include_board_games: IncludeBoardGames
     include_movies: IncludeMovies

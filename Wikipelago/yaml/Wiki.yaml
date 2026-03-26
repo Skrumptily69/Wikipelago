@@ -1,0 +1,28 @@
+name: WikiTester
+game: Wikipelago
+description: Clean Wikipelago template
+
+Wikipelago:
+  progression_balancing: 50
+  check_count: 50
+  required_fragments: 8
+  start_rounds_unlocked: 8
+  rounds_per_unlock: 5
+  random_goal_article: false
+  goal_article_preset: dark_souls
+  searchsanity: false
+  search_starting_letters: none
+
+  include_video_games: true
+  include_board_games: true
+  include_movies: true
+  include_tv_shows: true
+  include_anime_manga: true
+  include_sports: true
+  include_science_space: true
+  include_technology: true
+  include_history: true
+  include_geography: true
+  include_food_cuisine: true
+  include_art_literature: true
+  include_mythology_folklore: true

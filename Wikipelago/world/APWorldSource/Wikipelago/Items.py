@@ -20,3 +20,6 @@ item_table: dict[str, WikipelagoItemData] = {
     "Footnote": WikipelagoItemData(ITEM_OFFSET + 6, ItemClassification.filler),
     "Round Access": WikipelagoItemData(ITEM_OFFSET + 7, ItemClassification.progression),
 }
+
+for index, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ", start=20):
+    item_table[f"Search Letter {letter}"] = WikipelagoItemData(ITEM_OFFSET + index, ItemClassification.useful)

@@ -1,0 +1,27 @@
+﻿name: WikiFuzz008
+game: Wikipelago
+description: Auto-generated fuzz case
+
+Wikipelago:
+  progression_balancing: 44
+  check_count: 56
+  required_fragments: 9
+  start_rounds_unlocked: 7
+  rounds_per_unlock: 7
+  random_goal_article: True.ToLower()
+  goal_article_preset: the_matrix
+  searchsanity: False.ToLower()
+  search_starting_letters: none
+  include_video_games: True.ToLower()
+  include_board_games: False.ToLower()
+  include_movies: False.ToLower()
+  include_tv_shows: True.ToLower()
+  include_anime_manga: True.ToLower()
+  include_sports: False.ToLower()
+  include_science_space: True.ToLower()
+  include_technology: True.ToLower()
+  include_history: True.ToLower()
+  include_geography: False.ToLower()
+  include_food_cuisine: False.ToLower()
+  include_art_literature: True.ToLower()
+  include_mythology_folklore: False.ToLower()

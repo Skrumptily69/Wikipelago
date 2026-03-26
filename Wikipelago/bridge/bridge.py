@@ -71,6 +71,8 @@ class SessionState:
     start_rounds_unlocked: int = 5
     rounds_per_unlock: int = 5
     goal_required_round_access: int = 0
+    searchsanity: bool = False
+    search_starting_letters: list[str] = field(default_factory=list)
     round_pairs: list[dict[str, str]] = field(default_factory=lambda: [{"start": "Wikipedia", "target": "Philosophy"}])
     location_round_ids: list[int] = field(default_factory=list)
     location_grand_goal: int | None = None
@@ -92,6 +94,11 @@ class SessionState:
             return self.round_pairs[-1]["target"] if self.round_pairs else ""
         return self.round_pairs[self.round_index]["target"]
 
+    def current_start(self) -> str:
+        if self.round_index >= len(self.round_pairs):
+            return self.round_pairs[-1]["start"] if self.round_pairs else "Wikipedia"
+        return self.round_pairs[self.round_index]["start"]
+
     def goal_article(self) -> str:
         return self.round_pairs[-1]["target"] if self.round_pairs else ""
 
@@ -106,6 +113,13 @@ class SessionState:
     def has_item(self, name: str) -> bool:
         item_id = self.item_ids.get(name, DEFAULT_ITEMS.get(name, -1))
         return item_id in self.received_items
+
+    def owned_search_letters(self) -> list[str]:
+        letters = set(self.search_starting_letters)
+        for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            if self.has_item(f"Search Letter {letter}"):
+                letters.add(letter)
+        return sorted(letters)
 
     def boss_ready(self) -> bool:
         return (
@@ -123,6 +137,7 @@ class SessionState:
             "connected_to_ap": self.connected_to_ap,
             "ap_server": self.ap_server,
             "slot_name": self.slot_name,
+            "current_start": self.current_start(),
             "current_target": self.current_target(),
             "goal_article": self.goal_article(),
             "round": min(self.round_index + 1, self.check_count),
@@ -134,12 +149,15 @@ class SessionState:
             "rounds_per_unlock": self.rounds_per_unlock,
             "goal_required_round_access": self.goal_required_round_access,
             "unlocked_rounds": self.unlocked_rounds(),
+            "searchsanity": self.searchsanity,
             "back_button_unlocked": self.has_item("Back Button"),
             "ctrl_f_unlocked": self.has_item("Ctrl+F Lens"),
+            "search_letters": self.owned_search_letters(),
             "compass_unlocked": self.has_item("Wiki Compass"),
             "warmer_colder": self.warmer_colder,
             "boss_ready": self.boss_ready(),
             "boss_completed": self.boss_completed,
+            "last_page": self.last_page,
             "last_error": self.last_error,
         }
 
@@ -265,6 +283,10 @@ class APConnection:
         self.state.start_rounds_unlocked = int(slot_data.get("start_rounds_unlocked", self.state.start_rounds_unlocked))
         self.state.rounds_per_unlock = int(slot_data.get("rounds_per_unlock", self.state.rounds_per_unlock))
         self.state.goal_required_round_access = int(slot_data.get("goal_required_round_access", self.state.goal_required_round_access))
+        self.state.searchsanity = bool(slot_data.get("searchsanity", False))
+        starting_letters = slot_data.get("search_starting_letters", [])
+        if isinstance(starting_letters, list):
+            self.state.search_starting_letters = [str(letter).upper() for letter in starting_letters if str(letter)]
 
         location_ids = slot_data.get("location_ids", {})
         self.state.location_round_ids = [int(v) for v in location_ids.get("rounds", [])]
@@ -305,6 +327,8 @@ class APConnection:
                 self.state.goal_status_sent = True
 
         self._canonicalize_active_targets()
+        if not self.state.last_page:
+            self.state.last_page = self.state.current_start()
 
     @staticmethod
     def _to_ws_url(server: str) -> str:

@@ -170,6 +170,115 @@ EXACT_TITLE_TOPICS: dict[str, str] = {
     "youtube": "technology",
 }
 
+GLOBAL_START_ARTICLES: tuple[str, ...] = (
+    "Wikipedia",
+    "History",
+    "Science",
+    "Technology",
+    "Internet",
+    "Culture",
+    "Entertainment",
+    "Art",
+    "Food",
+    "Geography",
+)
+
+TOPIC_START_ARTICLES: dict[str, tuple[str, ...]] = {
+    "video_games": (
+        "Video game",
+        "Arcade game",
+        "Nintendo",
+        "PlayStation",
+        "Xbox",
+        "Game engine",
+    ),
+    "board_games": (
+        "Board game",
+        "Tabletop game",
+        "Card game",
+        "Chess",
+    ),
+    "movies": (
+        "Film",
+        "Cinema",
+        "Animation",
+        "Academy Awards",
+        "Screenplay",
+    ),
+    "tv_shows": (
+        "Television show",
+        "Television",
+        "Streaming television",
+        "Sitcom",
+        "Animation",
+    ),
+    "anime_manga": (
+        "Anime",
+        "Manga",
+        "Animation",
+        "Japanese popular culture",
+    ),
+    "sports": (
+        "Sport",
+        "Competition",
+        "Tournament",
+        "Athlete",
+    ),
+    "science_space": (
+        "Science",
+        "Astronomy",
+        "Physics",
+        "Biology",
+        "Space exploration",
+    ),
+    "technology": (
+        "Technology",
+        "Computer",
+        "Internet",
+        "World Wide Web",
+        "Software",
+    ),
+    "history": (
+        "History",
+        "Ancient history",
+        "Civilization",
+        "Archaeology",
+    ),
+    "geography": (
+        "Geography",
+        "Earth",
+        "Country",
+        "Landform",
+        "City",
+    ),
+    "food_cuisine": (
+        "Food",
+        "Cuisine",
+        "Cooking",
+        "Ingredient",
+    ),
+    "art_literature": (
+        "Art",
+        "Literature",
+        "Novel",
+        "Painting",
+        "Poetry",
+    ),
+    "mythology_folklore": (
+        "Mythology",
+        "Folklore",
+        "Legend",
+        "Myth",
+    ),
+}
+
+SEARCH_STARTING_LETTERS: dict[int, set[str]] = {
+    0: set(),
+    1: {"A", "E", "I", "O", "U"},
+    2: {"E", "T", "A", "O", "I"},
+    3: {"R", "A", "I", "S", "E"},
+}
+
 
 def _preset_goal_name(option_value: int) -> str:
     mapping = {
@@ -360,6 +469,23 @@ class WikipelagoWorld(World):
             return False
         return True
 
+    def _candidate_start_articles(self, target: str) -> list[str]:
+        topic = self._infer_topic(target)
+        ordered = list(TOPIC_START_ARTICLES.get(topic or "", ())) + list(GLOBAL_START_ARTICLES)
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for start in ordered:
+            if start == target:
+                continue
+            if start in seen:
+                continue
+            seen.add(start)
+            candidates.append(start)
+        return candidates
+
+    def _search_starting_letters(self) -> set[str]:
+        return set(SEARCH_STARTING_LETTERS.get(self.options.search_starting_letters.value, set()))
+
     def generate_early(self) -> None:
         round_count = self.options.check_count.value
         selected_topics = self._selected_topics()
@@ -413,21 +539,20 @@ class WikipelagoWorld(World):
 
         picks = self.random.sample(remaining, needed_non_goal)
         non_final_targets = picks[: round_count - 1]
-        base_starts = picks[round_count - 1:]
         targets = non_final_targets + [self.goal_article]
-        unused_starts = list(base_starts)
         pairs: list[dict[str, str]] = []
 
         for target in targets:
+            curated_starts = self._candidate_start_articles(target)
             challenging_and_doable = [
-                start for start in unused_starts
+                start for start in curated_starts
                 if self._is_doable_pair(start, target) and self._is_challenging_pair(start, target)
             ]
-            doable_only = [start for start in unused_starts if self._is_doable_pair(start, target)]
-            challenging_only = [start for start in unused_starts if self._is_challenging_pair(start, target)]
-            candidates = challenging_and_doable or doable_only or challenging_only or unused_starts
+            doable_only = [start for start in curated_starts if self._is_doable_pair(start, target)]
+            challenging_only = [start for start in curated_starts if self._is_challenging_pair(start, target)]
+            fallback = ["Wikipedia"] if target != "Wikipedia" else ["History"]
+            candidates = challenging_and_doable or doable_only or challenging_only or fallback
             start_choice = self.random.choice(candidates)
-            unused_starts.remove(start_choice)
             pairs.append({"start": start_choice, "target": target})
 
         self.round_pairs = pairs
@@ -446,13 +571,15 @@ class WikipelagoWorld(World):
         per_unlock = max(1, self.options.rounds_per_unlock.value)
         early_open = start_unlocked
         round_access_count = max(0, (round_count - early_open + per_unlock - 1) // per_unlock)
+        search_letters_needed = 26 - len(self._search_starting_letters()) if self.options.searchsanity.value else 0
 
-        mandatory_items = required_fragments + 3 + round_access_count
+        mandatory_items = required_fragments + 3 + round_access_count + search_letters_needed
         if mandatory_items > round_count:
             raise Exception(
                 "Wikipelago item math invalid: required progression items exceed round locations. "
                 f"mandatory={mandatory_items}, round_locations={round_count}. "
-                "Lower required_fragments or round_access pressure (increase start_rounds_unlocked / rounds_per_unlock)."
+                "Lower required_fragments, reduce sanity load, or lower round access pressure "
+                "(increase start_rounds_unlocked / rounds_per_unlock)."
             )
 
         pool: list[WikipelagoItem] = []
@@ -461,6 +588,10 @@ class WikipelagoWorld(World):
         pool.append(self.create_item("Back Button"))
         pool.append(self.create_item("Wiki Compass"))
         pool.append(self.create_item("Ctrl+F Lens"))
+        if self.options.searchsanity.value:
+            for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                if letter not in self._search_starting_letters():
+                    pool.append(self.create_item(f"Search Letter {letter}"))
         for _ in range(round_access_count):
             pool.append(self.create_item("Round Access"))
         while len(pool) < round_count:
@@ -516,6 +647,8 @@ class WikipelagoWorld(World):
             "goal_required_round_access": max(0, (round_count - start_unlocked + per_unlock - 1) // per_unlock),
             "goal_article": self.goal_article,
             "round_pairs": self.round_pairs,
+            "searchsanity": bool(self.options.searchsanity.value),
+            "search_starting_letters": sorted(self._search_starting_letters()),
             "location_ids": {
                 "rounds": round_location_ids,
                 "grand_goal": self.location_name_to_id["Grand Goal"],

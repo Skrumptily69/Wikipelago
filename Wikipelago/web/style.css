@@ -33,6 +33,30 @@ body {
 }
 
 .article-panel { padding: 12px; min-height: 78vh; }
+.search-overlay {
+  margin: 8px 0 10px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #395068;
+  background: #0e1620;
+}
+.search-row { display: flex; gap: 8px; }
+.search-row input {
+  flex: 1;
+  padding: 10px;
+  border-radius: 9px;
+  border: 1px solid #395068;
+  background: #0e1620;
+  color: var(--text);
+}
+.search-meta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 .article-head { display: flex; gap: 8px; }
 .article-head input {
   flex: 1;
@@ -63,6 +87,12 @@ button {
 .article-body a { color: #8dd9ff; text-decoration: underline; cursor: pointer; }
 .article-body table, .article-body img, .article-body .mw-editsection { display: none !important; }
 .article-body p, .article-body li { line-height: 1.45; }
+.wiki-search-hit {
+  background: #ffdf6b;
+  color: #1d1400;
+  border-radius: 3px;
+  padding: 0 1px;
+}
 
 .side-panel { display: flex; flex-direction: column; gap: 12px; }
 .card { padding: 12px; }
