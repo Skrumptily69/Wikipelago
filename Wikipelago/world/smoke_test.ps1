@@ -92,6 +92,7 @@ try {
     }
     Assert-NoPattern $yamlToCheck 'goal_article_preset:\s*pokemon\s*$' 'Invalid YAML preset alias found'
     Assert-HasPattern $yamlToCheck 'searchsanity:\s*(true|false)' 'YAML template is missing searchsanity'
+    Assert-HasPattern $yamlToCheck 'scrollsanity:\s*(true|false)' 'YAML template is missing scrollsanity'
     Assert-HasPattern $yamlToCheck 'search_starting_letters:\s*(none|all_vowels|etaoi|raise)' 'YAML template is missing search_starting_letters'
     Write-Pass "YAML template encoding and preset values look sane"
 } catch {
@@ -115,7 +116,9 @@ try {
     Assert-NoPattern $entertainmentPath '^\s*"Clue \(board game\)",?\s*$' 'Old Clue redirect title still present'
     Assert-HasPattern $initPath 'TOPIC_START_ARTICLES' 'Curated start article map is missing'
     Assert-HasPattern $optionsPath 'class Searchsanity' 'Searchsanity option is missing'
+    Assert-HasPattern $optionsPath 'class Scrollsanity' 'Scrollsanity option is missing'
     Assert-HasPattern $optionsPath 'class SearchStartingLetters' 'Search Starting Letters option is missing'
+    Assert-HasPattern $itemsPath '"Progressive Scroll Speed"' 'Progressive Scroll Speed item is missing'
     Assert-HasPattern $itemsPath 'for index, letter in enumerate\("ABCDEFGHIJKLMNOPQRSTUVWXYZ"' 'Search Letter item loop is missing'
     Write-Pass "Known bad title regressions are absent from source pools"
 } catch {
@@ -130,6 +133,8 @@ try {
     Assert-HasPattern $bridgePath '_titles_match' 'Bridge title matcher is missing'
     Assert-HasPattern $bridgePath 'current_start' 'Bridge current start status helper is missing'
     Assert-HasPattern $bridgePath 'searchsanity' 'Bridge searchsanity state is missing'
+    Assert-HasPattern $bridgePath 'scrollsanity' 'Bridge scrollsanity state is missing'
+    Assert-HasPattern $bridgePath 'scroll_speed_level' 'Bridge scroll speed status is missing'
     Assert-HasPattern $bridgePath 'search_starting_letters' 'Bridge search_starting_letters state is missing'
     Write-Pass "Bridge title-matching safeguards are present"
 } catch {
@@ -142,6 +147,8 @@ try {
     Assert-HasPattern $webAppPath 'restoreArticleView' 'Web restore-article flow is missing'
     Assert-HasPattern $webAppPath 'current_start' 'Web client is not using current_start resume data'
     Assert-HasPattern $webAppPath 'openSearchOverlay' 'Web search overlay helper is missing'
+    Assert-HasPattern $webAppPath 'SCROLL_SPEED_FACTORS' 'Web scroll speed table is missing'
+    Assert-HasPattern $webAppPath 'scrollFactor' 'Web scroll factor helper is missing'
     Assert-HasPattern $webAppPath 'sanitizeSearchInput' 'Web search letter gating helper is missing'
     Write-Pass "Web reconnect/resume safeguards are present"
 } catch {

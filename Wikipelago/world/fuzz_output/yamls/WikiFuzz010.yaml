@@ -3,16 +3,17 @@ game: Wikipelago
 description: Auto-generated fuzz case
 
 Wikipelago:
-  progression_balancing: 22
-  check_count: 77
-  required_fragments: 2
-  start_rounds_unlocked: 9
-  rounds_per_unlock: 1
+  progression_balancing: 49
+  check_count: 74
+  required_fragments: 10
+  start_rounds_unlocked: 4
+  rounds_per_unlock: 6
   random_goal_article: False.ToLower()
-  goal_article_preset: spongebob_squarepants
-  searchsanity: False.ToLower()
-  search_starting_letters: etaoi
-  include_video_games: False.ToLower()
+  goal_article_preset: avatar_the_last_airbender
+  searchsanity: True.ToLower()
+  scrollsanity: False.ToLower()
+  search_starting_letters: all_vowels
+  include_video_games: True.ToLower()
   include_board_games: False.ToLower()
   include_movies: False.ToLower()
   include_tv_shows: True.ToLower()
@@ -20,8 +21,8 @@ Wikipelago:
   include_sports: False.ToLower()
   include_science_space: True.ToLower()
   include_technology: False.ToLower()
-  include_history: False.ToLower()
-  include_geography: False.ToLower()
+  include_history: True.ToLower()
+  include_geography: True.ToLower()
   include_food_cuisine: True.ToLower()
   include_art_literature: True.ToLower()
   include_mythology_folklore: False.ToLower()

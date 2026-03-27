@@ -3,18 +3,19 @@ game: Wikipelago
 description: Auto-generated fuzz case
 
 Wikipelago:
-  progression_balancing: 38
-  check_count: 18
-  required_fragments: 4
-  start_rounds_unlocked: 12
-  rounds_per_unlock: 4
+  progression_balancing: 5
+  check_count: 43
+  required_fragments: 5
+  start_rounds_unlocked: 15
+  rounds_per_unlock: 7
   random_goal_article: True.ToLower()
-  goal_article_preset: super_smash_bros_ultimate
-  searchsanity: False.ToLower()
-  search_starting_letters: all_vowels
+  goal_article_preset: game_of_thrones
+  searchsanity: True.ToLower()
+  scrollsanity: False.ToLower()
+  search_starting_letters: etaoi
   include_video_games: False.ToLower()
-  include_board_games: False.ToLower()
-  include_movies: False.ToLower()
+  include_board_games: True.ToLower()
+  include_movies: True.ToLower()
   include_tv_shows: True.ToLower()
   include_anime_manga: False.ToLower()
   include_sports: True.ToLower()
@@ -23,5 +24,5 @@ Wikipelago:
   include_history: True.ToLower()
   include_geography: False.ToLower()
   include_food_cuisine: False.ToLower()
-  include_art_literature: True.ToLower()
-  include_mythology_folklore: True.ToLower()
+  include_art_literature: False.ToLower()
+  include_mythology_folklore: False.ToLower()

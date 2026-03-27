@@ -279,6 +279,8 @@ SEARCH_STARTING_LETTERS: dict[int, set[str]] = {
     3: {"R", "A", "I", "S", "E"},
 }
 
+SCROLL_SPEED_UPGRADES = 5
+
 
 def _preset_goal_name(option_value: int) -> str:
     mapping = {
@@ -572,8 +574,9 @@ class WikipelagoWorld(World):
         early_open = start_unlocked
         round_access_count = max(0, (round_count - early_open + per_unlock - 1) // per_unlock)
         search_letters_needed = 26 - len(self._search_starting_letters()) if self.options.searchsanity.value else 0
+        scroll_upgrades_needed = SCROLL_SPEED_UPGRADES if self.options.scrollsanity.value else 0
 
-        mandatory_items = required_fragments + 3 + round_access_count + search_letters_needed
+        mandatory_items = required_fragments + 3 + round_access_count + search_letters_needed + scroll_upgrades_needed
         if mandatory_items > round_count:
             raise Exception(
                 "Wikipelago item math invalid: required progression items exceed round locations. "
@@ -588,6 +591,9 @@ class WikipelagoWorld(World):
         pool.append(self.create_item("Back Button"))
         pool.append(self.create_item("Wiki Compass"))
         pool.append(self.create_item("Ctrl+F Lens"))
+        if self.options.scrollsanity.value:
+            for _ in range(SCROLL_SPEED_UPGRADES):
+                pool.append(self.create_item("Progressive Scroll Speed"))
         if self.options.searchsanity.value:
             for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
                 if letter not in self._search_starting_letters():
@@ -648,6 +654,8 @@ class WikipelagoWorld(World):
             "goal_article": self.goal_article,
             "round_pairs": self.round_pairs,
             "searchsanity": bool(self.options.searchsanity.value),
+            "scrollsanity": bool(self.options.scrollsanity.value),
+            "scroll_speed_upgrades": SCROLL_SPEED_UPGRADES,
             "search_starting_letters": sorted(self._search_starting_letters()),
             "location_ids": {
                 "rounds": round_location_ids,

@@ -3,25 +3,26 @@ game: Wikipelago
 description: Auto-generated fuzz case
 
 Wikipelago:
-  progression_balancing: 44
-  check_count: 56
-  required_fragments: 9
-  start_rounds_unlocked: 7
+  progression_balancing: 64
+  check_count: 74
+  required_fragments: 1
+  start_rounds_unlocked: 15
   rounds_per_unlock: 7
   random_goal_article: True.ToLower()
-  goal_article_preset: the_matrix
+  goal_article_preset: chess
   searchsanity: False.ToLower()
+  scrollsanity: False.ToLower()
   search_starting_letters: none
   include_video_games: True.ToLower()
   include_board_games: False.ToLower()
   include_movies: False.ToLower()
-  include_tv_shows: True.ToLower()
+  include_tv_shows: False.ToLower()
   include_anime_manga: True.ToLower()
-  include_sports: False.ToLower()
+  include_sports: True.ToLower()
   include_science_space: True.ToLower()
-  include_technology: True.ToLower()
-  include_history: True.ToLower()
-  include_geography: False.ToLower()
+  include_technology: False.ToLower()
+  include_history: False.ToLower()
+  include_geography: True.ToLower()
   include_food_cuisine: False.ToLower()
   include_art_literature: True.ToLower()
-  include_mythology_folklore: False.ToLower()
+  include_mythology_folklore: True.ToLower()

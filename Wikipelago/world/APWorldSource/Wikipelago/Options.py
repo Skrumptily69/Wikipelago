@@ -41,6 +41,11 @@ class Searchsanity(Toggle):
     default = 0
 
 
+class Scrollsanity(Toggle):
+    display_name = "Scrollsanity"
+    default = 0
+
+
 class SearchStartingLetters(Choice):
     display_name = "Search Starting Letters"
     option_none = 0
@@ -148,6 +153,7 @@ class WikipelagoOptions(PerGameCommonOptions):
     rounds_per_unlock: RoundsPerUnlock
     random_goal_article: RandomGoalArticle
     searchsanity: Searchsanity
+    scrollsanity: Scrollsanity
     search_starting_letters: SearchStartingLetters
     include_video_games: IncludeVideoGames
     include_board_games: IncludeBoardGames

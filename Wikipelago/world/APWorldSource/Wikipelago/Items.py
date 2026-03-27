@@ -19,6 +19,7 @@ item_table: dict[str, WikipelagoItemData] = {
     "Victory": WikipelagoItemData(ITEM_OFFSET + 5, ItemClassification.progression_skip_balancing),
     "Footnote": WikipelagoItemData(ITEM_OFFSET + 6, ItemClassification.filler),
     "Round Access": WikipelagoItemData(ITEM_OFFSET + 7, ItemClassification.progression),
+    "Progressive Scroll Speed": WikipelagoItemData(ITEM_OFFSET + 8, ItemClassification.useful),
 }
 
 for index, letter in enumerate("ABCDEFGHIJKLMNOPQRSTUVWXYZ", start=20):

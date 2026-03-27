@@ -1,5 +1,7 @@
-const APP_VERSION = "2026.03.26.1";
+const APP_VERSION = "2026.03.26.2";
 console.log("Wikipelago web version", APP_VERSION);
+
+const SCROLL_SPEED_FACTORS = [0.18, 0.28, 0.42, 0.6, 0.8, 1];
 
 const state = {
   sessionId: localStorage.getItem("wikipelago_session_id") || "",
@@ -35,6 +37,7 @@ const el = {
   backItem: document.getElementById("backItem"),
   searchItem: document.getElementById("searchItem"),
   searchLettersItem: document.getElementById("searchLettersItem"),
+  scrollItem: document.getElementById("scrollItem"),
   compassItem: document.getElementById("compassItem"),
   toast: document.getElementById("toast"),
 };
@@ -89,6 +92,15 @@ function renderSearchStatus() {
   } else {
     el.searchStatus.textContent = "Search ready";
   }
+}
+
+function scrollLevel() {
+  return Math.max(0, Math.min(state.status?.scroll_speed_level || 0, state.status?.scroll_speed_upgrades || 5));
+}
+
+function scrollFactor() {
+  const level = Math.max(0, Math.min(scrollLevel(), SCROLL_SPEED_FACTORS.length - 1));
+  return state.status?.scrollsanity ? SCROLL_SPEED_FACTORS[level] : 1;
 }
 
 function closeSearchOverlay() {
@@ -244,6 +256,11 @@ function updateHUD(status) {
   el.backItem.textContent = status.back_button_unlocked ? "Unlocked" : "Locked";
   el.searchItem.textContent = status.ctrl_f_unlocked ? "Unlocked" : "Locked";
   renderSearchStatus();
+  if (status.scrollsanity) {
+    el.scrollItem.textContent = `${status.scroll_speed_level}/${status.scroll_speed_upgrades}`;
+  } else {
+    el.scrollItem.textContent = "Off";
+  }
   el.compassItem.textContent = status.compass_unlocked ? "Unlocked" : "Locked";
 
   if (status.boss_completed && !wasComplete && !state.announcedGoalComplete) {
@@ -356,6 +373,12 @@ el.articleBody.addEventListener("click", (e) => {
   openArticle(a.dataset.title, { countAsClick: true });
 });
 
+el.articleBody.addEventListener("wheel", (e) => {
+  if (!state.status?.scrollsanity) return;
+  e.preventDefault();
+  el.articleBody.scrollTop += e.deltaY * scrollFactor();
+}, { passive: false });
+
 el.connectBtn.addEventListener("click", async () => {
   try {
     await ensureSession();
@@ -418,6 +441,29 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.searchOpen) {
     e.preventDefault();
     closeSearchOverlay();
+  }
+  if (state.status?.scrollsanity && !["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) {
+    const factor = scrollFactor();
+    const keyToAmount = {
+      ArrowDown: 40,
+      ArrowUp: -40,
+      PageDown: 320,
+      PageUp: -320,
+      Home: -1_000_000,
+      End: 1_000_000,
+      " ": e.shiftKey ? -320 : 320,
+    };
+    if (Object.prototype.hasOwnProperty.call(keyToAmount, e.key)) {
+      e.preventDefault();
+      const amount = keyToAmount[e.key];
+      if (e.key === "Home") {
+        el.articleBody.scrollTop = 0;
+      } else if (e.key === "End") {
+        el.articleBody.scrollTop = el.articleBody.scrollHeight;
+      } else {
+        el.articleBody.scrollTop += amount * factor;
+      }
+    }
   }
 });
 

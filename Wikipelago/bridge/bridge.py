@@ -24,6 +24,7 @@ DEFAULT_ITEMS = {
     "Back Button": 1_870_002,
     "Wiki Compass": 1_870_003,
     "Ctrl+F Lens": 1_870_004,
+    "Progressive Scroll Speed": 1_870_008,
     "Round Access": 1_870_007,
 }
 
@@ -72,6 +73,8 @@ class SessionState:
     rounds_per_unlock: int = 5
     goal_required_round_access: int = 0
     searchsanity: bool = False
+    scrollsanity: bool = False
+    scroll_speed_upgrades: int = 5
     search_starting_letters: list[str] = field(default_factory=list)
     round_pairs: list[dict[str, str]] = field(default_factory=lambda: [{"start": "Wikipedia", "target": "Philosophy"}])
     location_round_ids: list[int] = field(default_factory=list)
@@ -114,6 +117,10 @@ class SessionState:
         item_id = self.item_ids.get(name, DEFAULT_ITEMS.get(name, -1))
         return item_id in self.received_items
 
+    def item_count(self, name: str) -> int:
+        item_id = self.item_ids.get(name, DEFAULT_ITEMS.get(name, -1))
+        return sum(1 for item in self.received_items if item == item_id)
+
     def owned_search_letters(self) -> list[str]:
         letters = set(self.search_starting_letters)
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
@@ -150,6 +157,9 @@ class SessionState:
             "goal_required_round_access": self.goal_required_round_access,
             "unlocked_rounds": self.unlocked_rounds(),
             "searchsanity": self.searchsanity,
+            "scrollsanity": self.scrollsanity,
+            "scroll_speed_upgrades": self.scroll_speed_upgrades,
+            "scroll_speed_level": self.item_count("Progressive Scroll Speed"),
             "back_button_unlocked": self.has_item("Back Button"),
             "ctrl_f_unlocked": self.has_item("Ctrl+F Lens"),
             "search_letters": self.owned_search_letters(),
@@ -284,6 +294,8 @@ class APConnection:
         self.state.rounds_per_unlock = int(slot_data.get("rounds_per_unlock", self.state.rounds_per_unlock))
         self.state.goal_required_round_access = int(slot_data.get("goal_required_round_access", self.state.goal_required_round_access))
         self.state.searchsanity = bool(slot_data.get("searchsanity", False))
+        self.state.scrollsanity = bool(slot_data.get("scrollsanity", False))
+        self.state.scroll_speed_upgrades = int(slot_data.get("scroll_speed_upgrades", self.state.scroll_speed_upgrades))
         starting_letters = slot_data.get("search_starting_letters", [])
         if isinstance(starting_letters, list):
             self.state.search_starting_letters = [str(letter).upper() for letter in starting_letters if str(letter)]

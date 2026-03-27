@@ -62,6 +62,7 @@ function Test-LocalSettings([hashtable]$Settings) {
         default { 0 }
     }
     $searchLettersNeeded = if ($Settings.searchsanity) { 26 - $startingLetters } else { 0 }
+    $scrollUpgradesNeeded = if ($Settings.scrollsanity) { 5 } else { 0 }
 
     if ($required -gt $checkCount) {
         return "required_fragments exceeds check_count"
@@ -71,7 +72,7 @@ function Test-LocalSettings([hashtable]$Settings) {
     }
 
     $roundAccessCount = [Math]::Max(0, [int][Math]::Ceiling(($checkCount - $startUnlocked) / [double]$perUnlock))
-    $mandatoryItems = $required + 3 + $roundAccessCount + $searchLettersNeeded
+    $mandatoryItems = $required + 3 + $roundAccessCount + $searchLettersNeeded + $scrollUpgradesNeeded
     if ($mandatoryItems -gt $checkCount) {
         return "mandatory progression items exceed available round checks"
     }
@@ -96,6 +97,7 @@ function New-WikipelagoSettings {
             random_goal_article = Get-RandomBool
             goal_article_preset = Get-GoalPreset
             searchsanity = Get-RandomBool
+            scrollsanity = Get-RandomBool
             search_starting_letters = Get-Random -InputObject $searchLetterModes
             include_video_games = Get-RandomBool
             include_board_games = Get-RandomBool
@@ -137,6 +139,7 @@ Wikipelago:
   random_goal_article: $([string]$Settings.random_goal_article).ToLower()
   goal_article_preset: $($Settings.goal_article_preset)
   searchsanity: $([string]$Settings.searchsanity).ToLower()
+  scrollsanity: $([string]$Settings.scrollsanity).ToLower()
   search_starting_letters: $($Settings.search_starting_letters)
   include_video_games: $([string]$Settings.include_video_games).ToLower()
   include_board_games: $([string]$Settings.include_board_games).ToLower()
