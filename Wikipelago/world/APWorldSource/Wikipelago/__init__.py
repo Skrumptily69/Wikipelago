@@ -613,15 +613,11 @@ class WikipelagoWorld(World):
         start_unlocked = min(self.options.start_rounds_unlocked.value, round_count)
         per_unlock = max(1, self.options.rounds_per_unlock.value)
         early_open = start_unlocked
-        goal_round_access = max(0, (round_count - start_unlocked + per_unlock - 1) // per_unlock)
 
         goal_location = self.multiworld.get_location("Grand Goal", self.player)
         set_rule(
             goal_location,
-            lambda state, frag_need=required_fragments, ra_need=goal_round_access: (
-                state.has("Knowledge Fragment", self.player, frag_need)
-                and state.has("Round Access", self.player, ra_need)
-            ),
+            lambda state, frag_need=required_fragments: state.has("Knowledge Fragment", self.player, frag_need),
         )
 
         for round_index in range(1, round_count + 1):
@@ -650,7 +646,6 @@ class WikipelagoWorld(World):
             "required_fragments": required_fragments,
             "start_rounds_unlocked": start_unlocked,
             "rounds_per_unlock": per_unlock,
-            "goal_required_round_access": max(0, (round_count - start_unlocked + per_unlock - 1) // per_unlock),
             "goal_article": self.goal_article,
             "round_pairs": self.round_pairs,
             "searchsanity": bool(self.options.searchsanity.value),

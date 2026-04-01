@@ -7,21 +7,21 @@ class CheckCount(Range):
     display_name = "Round Count"
     range_start = 10
     range_end = 5000
-    default = 50
+    default = 25
 
 
 class RequiredFragments(Range):
     display_name = "Required Fragments"
     range_start = 1
     range_end = 5000
-    default = 8
+    default = 5
 
 
 class StartRoundsUnlocked(Range):
     display_name = "Start Rounds Unlocked"
     range_start = 1
     range_end = 100
-    default = 8
+    default = 10
 
 
 class RoundsPerUnlock(Range):

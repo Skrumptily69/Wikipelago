@@ -71,7 +71,6 @@ class SessionState:
     required_fragments: int = 8
     start_rounds_unlocked: int = 5
     rounds_per_unlock: int = 5
-    goal_required_round_access: int = 0
     searchsanity: bool = False
     scrollsanity: bool = False
     scroll_speed_upgrades: int = 5
@@ -129,10 +128,7 @@ class SessionState:
         return sorted(letters)
 
     def boss_ready(self) -> bool:
-        return (
-            self.fragments() >= self.required_fragments
-            and self.round_access_count() >= self.goal_required_round_access
-        )
+        return self.fragments() >= self.required_fragments
 
     def unlocked_rounds(self) -> int:
         step = max(1, self.rounds_per_unlock)
@@ -154,7 +150,6 @@ class SessionState:
             "required_fragments": self.required_fragments,
             "start_rounds_unlocked": self.start_rounds_unlocked,
             "rounds_per_unlock": self.rounds_per_unlock,
-            "goal_required_round_access": self.goal_required_round_access,
             "unlocked_rounds": self.unlocked_rounds(),
             "searchsanity": self.searchsanity,
             "scrollsanity": self.scrollsanity,
@@ -292,7 +287,6 @@ class APConnection:
         self.state.required_fragments = int(slot_data.get("required_fragments", self.state.required_fragments))
         self.state.start_rounds_unlocked = int(slot_data.get("start_rounds_unlocked", self.state.start_rounds_unlocked))
         self.state.rounds_per_unlock = int(slot_data.get("rounds_per_unlock", self.state.rounds_per_unlock))
-        self.state.goal_required_round_access = int(slot_data.get("goal_required_round_access", self.state.goal_required_round_access))
         self.state.searchsanity = bool(slot_data.get("searchsanity", False))
         self.state.scrollsanity = bool(slot_data.get("scrollsanity", False))
         self.state.scroll_speed_upgrades = int(slot_data.get("scroll_speed_upgrades", self.state.scroll_speed_upgrades))
